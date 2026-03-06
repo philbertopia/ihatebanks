@@ -1,0 +1,66 @@
+alpaca:
+  paper: true
+  base_url: "https://paper-api.alpaca.markets/v2"
+  data_url: "https://data.alpaca.markets/v1beta1"
+  feed: "indicative"
+
+strategy:
+  target_delta: 0.80
+  min_delta: 0.65
+  delta_tolerance: 0.10
+  max_extrinsic_pct: 0.30
+  ideal_extrinsic_pct: 0.20
+  min_open_interest: 200
+  require_open_interest: false  # indicative feed doesn't return OI; set true with opra feed
+  max_spread_pct: 0.10
+  min_dte: 30
+  max_dte: 60
+  option_type: "call"
+  prefer_monthly: true
+  monthly_only: true
+  avoid_final_week: true
+  # Trend template: 10 EMA vs 20 EMA and price vs 50 EMA
+  require_symbol_bullish_trend: true
+  sit_in_cash_when_bearish: true
+  market_trend_symbol: "SPY"
+  trend_ema_fast: 10
+  trend_ema_medium: 20
+  trend_ema_slow: 50
+  trend_lookback_days: 180
+
+execution:
+  dry_run: true
+  order_type: "limit"
+  limit_price_buffer: 0.02
+  universe_profile: "top_50"
+  enforce_allocator_live: false
+  block_first_minutes: 5
+  target_annual_vol: 0.18
+  max_positions: 10
+  contracts_per_trade: 1
+
+scanner:
+  request_pause_ms: 0
+
+risk:
+  portfolio_heat_cap_pct: 0.08
+  max_pair_corr: 0.75
+  max_high_corr_positions: 2
+  kill_switch_expectancy_floor_r: -0.15
+  kill_switch_lookback_trades: 30
+  kill_switch_cooldown_days: 5
+  macro_no_trade_window_hours: 6
+
+reporting:
+  output_format: "console"
+  report_path: "logs/daily_report.txt"
+  top_candidates_per_symbol: 3
+
+database:
+  path: "db/ovtlyr.db"
+
+logging:
+  level: "INFO"
+  file: "logs/ovtlyr.log"
+  max_bytes: 5242880
+  backup_count: 3

@@ -1,0 +1,72 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+env/
+pip-wheel-metadata/
+*.egg-info/
+
+# --- Local env / secrets ---
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- Runtime outputs ---
+logs/
+db/*.db
+db/*.sqlite
+db/*.sqlite3
+*.log
+
+# --- Large local data caches ---
+data/cache/
+data/*.parquet
+data/backtest_results.json
+data/backtest_history.json
+data/backtest_runs.json
+data/walkforward_summary.json
+data/walkforward_runs.json
+
+# --- Legacy/internal files not for public release ---
+data/trading-system/
+data/*.pdf
+data/*.txt
+data/reports/
+data/backtest_archive.md
+data/ovtlyr_*.md
+
+# --- Frontend build artifacts ---
+dashboard/node_modules/
+dashboard/.next/
+dashboard/out/
+dashboard/.vercel/
+dashboard/*.tsbuildinfo
+
+# --- Frontend env ---
+dashboard/.env
+dashboard/.env.local
+dashboard/.env.production
+dashboard/.env.development
+!dashboard/.env.example
+
+# --- Internal local tooling ---
+.claude/
+

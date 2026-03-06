@@ -1,0 +1,861 @@
+[
+  {
+    "strategy_id": "openclaw_put_credit_spread",
+    "strategy_name": "OpenClaw Put Credit Spread",
+    "variant": "legacy_replica",
+    "status": "active",
+    "champion": true,
+    "universe_note": "Trades SPY + QQQ only \u2014 not affected by stock universe selection",
+    "description": "Regime-filtered SPY/QQQ put credit spreads with legacy fill assumptions. Best overall performer: +139% return, 98.6% win rate, 3.87 Sharpe, only 2.1% max drawdown over 2020-2025.",
+    "hypothesis": "High hit-rate premium collection via short OTM puts on broad-market ETFs during bullish regimes.",
+    "entry_rules": [
+      "Price above MA200 and MA20 above MA50 (bullish regime)",
+      "HV20 between 12% and 90%",
+      "Short put 4.5% OTM, width 5% of price",
+      "Credit target ~33% of spread width",
+      "Risk 1.5% of capital per trade, max 3 contracts"
+    ],
+    "management_rules": [
+      "Take profit at 50% of credit received (min 3 days held)",
+      "Stop at 2.2x credit received or 55% of width",
+      "Close at 10 DTE (time exit)",
+      "Close if long strike breached"
+    ]
+  },
+  {
+    "strategy_id": "openclaw_put_credit_spread",
+    "strategy_name": "OpenClaw Put Credit Spread",
+    "variant": "pcs_vix_optimal",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only \u2014 not affected by stock universe selection",
+    "description": "Legacy PCS + HV30 gate: skips entries when SPY HV30 < 10% (too calm, thin premium) or > 40% (panic). Result: +125.8% return, 98.45% win rate, PF 21.51 \u2014 slightly lower than legacy_replica (+139%) due to missed entries in extreme-vol periods.",
+    "hypothesis": "Moderate volatility (10-40%) produces the most favourable risk/reward for short put credit spreads."
+  },
+  {
+    "strategy_id": "openclaw_put_credit_spread",
+    "strategy_name": "OpenClaw Put Credit Spread",
+    "variant": "pcs_trend_baseline",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only \u2014 not affected by stock universe selection",
+    "description": "Trend-filtered PCS baseline with volatility-target sizing (18% annual target) and symbol notional caps.",
+    "hypothesis": "Regime confirmation plus vol-target sizing should improve risk-adjusted consistency versus static-size PCS."
+  },
+  {
+    "strategy_id": "openclaw_put_credit_spread",
+    "strategy_name": "OpenClaw Put Credit Spread",
+    "variant": "pcs_trend_defensive",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only \u2014 not affected by stock universe selection",
+    "description": "Defensive trend-filtered PCS with lower target volatility (14%), tighter risk budget, and reduced symbol notional cap.",
+    "hypothesis": "Defensive vol-target sizing should reduce drawdowns while preserving a high win-rate profile."
+  },
+  {
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "baseline",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Uses selected universe profile (default top_50) with synthetic/observed data-quality flags",
+    "description": "Open-at-09:35 and close-by-15:55 intraday option strategy using ITM, ATR, unusual-flow proxy, and similarity win-rate scoring.",
+    "hypothesis": "Balanced target/stop profile can capture intraday directional moves while limiting downside with fixed same-day exits."
+  },
+  {
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "conservative",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Uses selected universe profile (default top_50) with stricter spread and unusual-flow thresholds",
+    "description": "Conservative intraday profile with tighter stop-loss and earlier trailing activation to improve consistency and win rate.",
+    "hypothesis": "Lower risk-per-trade and stricter quality gates should improve win-rate at the cost of capped upside."
+  },
+  {
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "aggressive",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Uses selected universe profile (default top_50) with looser spread and opportunity filters",
+    "description": "Aggressive intraday profile with larger target and wider stop to pursue larger single-session option gains.",
+    "hypothesis": "Higher reward-to-risk profile can outperform in strong directional sessions, with lower win-rate tolerance."
+  },
+  {
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "oos_hardened",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Uses selected universe profile (default top_50) with strict liquidity, spread, and data-quality gates",
+    "description": "Validation-focused intraday profile: one high-quality trade/day max, tighter stops, smaller allocation, stricter liquidity thresholds, and stronger modeled-data penalties.",
+    "hypothesis": "Reducing trade count and tightening execution-quality filters should improve out-of-sample Sharpe and drawdown stability, even with lower raw return."
+  },
+  {
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "wf_v1_liquidity_guard",
+    "status": "experimental",
+    "validated": false,
+    "champion": false,
+    "universe_note": "Top-50 universe with entry-safe lagged feature timing and modeled-only candidates excluded",
+    "description": "Validation sweep v1 with low turnover and strict liquidity constraints.",
+    "hypothesis": "Better fill quality and lower noise should improve OOS consistency versus baseline intraday profiles."
+  },
+  {
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "wf_v2_flow_strict",
+    "status": "experimental",
+    "validated": false,
+    "champion": false,
+    "universe_note": "Top-50 universe with entry-safe lagged features, stronger unusual-flow threshold, and modeled-only exclusion",
+    "description": "Validation sweep v2 emphasizing unusual-flow quality and tighter spread controls.",
+    "hypothesis": "Higher conviction flow setups can improve Sharpe even with fewer total trades."
+  },
+  {
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "wf_v3_regime_strict",
+    "status": "experimental",
+    "validated": false,
+    "champion": false,
+    "universe_note": "Top-50 universe with lagged symbol trend plus SPY regime alignment",
+    "description": "Validation sweep v3 using strict directional regime gating for both symbol and index context.",
+    "hypothesis": "Filtering entries to aligned market regimes reduces adverse directional noise."
+  },
+  {
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "wf_v4_validated_candidate",
+    "status": "experimental",
+    "validated": false,
+    "champion": false,
+    "universe_note": "Top-50 universe candidate intended for validation promotion if OOS criteria are met",
+    "description": "Validation sweep v4 blended profile targeting pass criteria under 504/126/126 walk-forward.",
+    "hypothesis": "Balanced gating can retain enough edge while keeping drawdown and variability controlled."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "base",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Best results with focused default universe (AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, SPY, QQQ, AMD). Top_50 dilutes performance with lower-quality symbols.",
+    "description": "Deep ITM call replacement at ~80 delta. No trend gate. Flexible DTE (8-60 days). +45.7% return with top_50 universe, higher with focused default universe.",
+    "hypothesis": "Balanced directional exposure with high delta capturing most of the underlying move.",
+    "entry_rules": [
+      "Target delta near 0.80 (+/- 0.10)",
+      "Extrinsic percent <= 30% of ask",
+      "Bid/ask spread <= 10% of ask",
+      "Open interest >= 500 (when available)",
+      "DTE 8-60 days, prefer monthly expirations"
+    ],
+    "management_rules": [
+      "Roll when delta falls below 0.65",
+      "Roll when DTE <= 7",
+      "Keep one position per underlying symbol"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "full_filter_stack",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Best with focused default universe. Sector gate requires XLK/XLC/XLY in cache.",
+    "description": "All four gates stacked: VIX proxy + breadth (market-wide) + order block + sector trend (per-symbol). Result: +71.1%, Sharpe 0.29, max DD 36.9% \u2014 best stock replacement result. Synergistic effect: market gates filter bad conditions, per-symbol filters select best entries within good conditions.",
+    "hypothesis": "Stacking all market-quality filters maximises signal precision at the cost of trade frequency and raw return."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "uhl_authentic",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Most faithful replication of Chris Uhl's complete OVTLYR strategy",
+    "description": "Complete OVTLYR ruleset: 80 delta monthly calls, 30-90 DTE, sit-in-cash regime gate, plus Plan M exits \u2014 close on bearish EMA cross, take profit at +30%, stop loss at -20%. These Plan M exits were missing from all other variants.",
+    "hypothesis": "Adding Plan M exits (bearish cross close, profit target, stop loss) should improve Sharpe by cutting losers and locking gains, closely matching Chris Uhl's actual trading discipline."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "uhl_bearish_cross_only",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Same universe as uhl_authentic \u2014 trend gates drive stock selection more than universe size",
+    "description": "Uhl rules (monthly calls, trend gate, sit-in-cash) with ONLY the bearish EMA cross exit \u2014 no profit target or stop loss. Tests whether the -20% SL was causing the -37% return in uhl_authentic by exiting too early on volatile tech stocks.",
+    "hypothesis": "Removing the stop loss and profit target should allow winners to run longer and avoid premature SL exits on volatile tech options."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "uhl_loose_stop_40",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Same universe as uhl_authentic \u2014 trend gates drive stock selection more than universe size",
+    "description": "Uhl rules + Plan M exits but with -40% stop loss instead of -20%. Deep ITM calls on volatile tech stocks need more room before cutting \u2014 a tighter stop causes frequent early exits before the position recovers.",
+    "hypothesis": "Widening the stop loss from -20% to -40% reduces premature exits while still protecting against genuine trend reversals."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "full_filter_20pos",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Requires top_50 universe. Raising max_positions 10\u219220 turned +71.1% into +323.8% \u2014 4x uplift from diversification alone.",
+    "description": "full_filter_stack (all 4 signal gates) with max_positions raised from 10 to 20 and top_50 universe. Massive improvement from diversification: +323.8% return, Sharpe 0.65, Max DD 56.4%. Baseline champion for stock-selection experiments.",
+    "hypothesis": "More concurrent positions in a filtered universe reduces concentration risk and improves overall return without sacrificing quality."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "full_filter_iv_rank",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Requires top_50 universe. IV rank gate cuts max drawdown from 56.4%\u219241.4% with only 21pp return sacrifice. Best Sharpe in the stock replacement family.",
+    "description": "full_filter_20pos + IV rank gate: only enters when a symbol options IV rank is in the bottom 40th percentile of its own 252-day history (cheap options). Result: +302.7%, Sharpe 0.70, Max DD 41.4%. Lower return than baseline but significantly better risk profile (DD -15pp, Sharpe +0.05).",
+    "hypothesis": "Buying deep ITM calls when IV is historically low reduces the extrinsic cost basis and improves per-trade risk/reward."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "full_filter_rs",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "top_50 universe \u2014 RS requires SPY in the cache as benchmark",
+    "description": "full_filter_20pos + relative strength gate: only enters when a stock has outperformed SPY over the past 90 trading days. RS avoids the crash-survivor failure mode of absolute momentum. Result: +208.2%, Sharpe 0.53, Max DD 52.5%. Worse than baseline \u2014 RS alone over-filters.",
+    "hypothesis": "Stocks outperforming SPY have genuine relative strength and are more likely to continue their directional trend, improving win rate for directional call buyers."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "full_filter_iv_rs",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Requires top_50 universe. Best risk-adjusted variant: +320.5% return (near baseline) with 15.6pp lower max drawdown (40.8% vs 56.4%).",
+    "description": "full_filter_20pos + both IV rank (< 40th percentile, 252d lookback) AND relative strength (stock >= SPY over 90d) gates combined. Best risk-adjusted result: +320.5% (near baseline), Sharpe 0.68, Max DD 40.8% (vs 56.4% baseline). Nearly same return with 15.6pp lower drawdown.",
+    "hypothesis": "Combining cheap option premium with relative outperformance captures the best risk/reward setups: strong stock + inexpensive calls."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "full_filter_momentum",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "top_50 universe \u00e2\u20ac\u201d momentum ranking requires enough stocks to compare",
+    "description": "full_filter_20pos + 90-day momentum rank gate (top 50% by return). Result: +29.6%, Max DD 11.2% \u2014 momentum filter hurts returns by blocking recovery entries after market drawdowns.",
+    "hypothesis": "Stock-level momentum ranking above the 4 quality gates should concentrate entries in the strongest performers."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "full_filter_momentum_strict",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "top_50 universe",
+    "description": "full_filter_20pos + 90-day momentum rank gate (top 25% only). Result: +7.2%, Max DD 6.3% \u2014 too few qualifying entries, compounding effect lost.",
+    "hypothesis": "Only entering the top-quartile momentum stocks should produce the cleanest directional exposure."
+  },
+  {
+    "strategy_id": "openclaw_put_credit_spread",
+    "strategy_name": "OpenClaw Put Credit Spread",
+    "variant": "pcs_balanced_plus",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only \u2014 not affected by stock universe selection",
+    "description": "Larger risk budget (1.5%), better credit (30% of width), tighter stop (1.9x), broader IV window. +58.6% return, 100% win rate, 1.58 Sharpe, 0.57% max drawdown.",
+    "hypothesis": "Improved return over realistic_priced while maintaining near-100% win rate."
+  },
+  {
+    "strategy_id": "openclaw_put_credit_spread",
+    "strategy_name": "OpenClaw Put Credit Spread",
+    "variant": "pcs_income_plus",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only \u2014 not affected by stock universe selection",
+    "description": "Higher turnover with faster profit-taking (40% target) and broader IV window (up to 65%). +54.1% return, 100% win rate, 1.37 Sharpe.",
+    "hypothesis": "Higher annualized return through more frequent entry/exit cycles in moderate-volatility regimes."
+  },
+  {
+    "strategy_id": "openclaw_put_credit_spread",
+    "strategy_name": "OpenClaw Put Credit Spread",
+    "variant": "pcs_conservative_turnover",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only \u2014 not affected by stock universe selection",
+    "description": "Conservative sizing (1.0% risk), early winner exits (35% profit target), closes at 14 DTE. +51.3% return, 100% win rate, 1.26 Sharpe, 0.58% max drawdown.",
+    "hypothesis": "Smoother equity curve with lowest drawdown at the cost of slightly lower upside."
+  },
+  {
+    "strategy_id": "openclaw_put_credit_spread",
+    "strategy_name": "OpenClaw Put Credit Spread",
+    "variant": "realistic_priced",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only \u2014 not affected by stock universe selection",
+    "description": "Stricter fills, tighter volatility window (18-55%), higher fees ($4/contract), max 2 contracts. +40.6% return, 98.3% win rate, 0.47 Sharpe, 0.80% max drawdown.",
+    "hypothesis": "Most conservative real-world estimate of put credit spread profitability."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "conservative_85d",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Best results with focused default universe (top 10 large-caps). Top_50 dilutes performance.",
+    "description": "Higher-delta variant (0.85 target, +/-0.08) for more stock-like behavior. +40.3% return with top_50 universe.",
+    "hypothesis": "Lower gamma/theta sensitivity with tighter delta range, at the cost of higher premium outlay."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "strict_extrinsic_20",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Best results with focused default universe (top 10 large-caps). Top_50 dilutes performance.",
+    "description": "Limits entries to contracts with extrinsic <= 20% of ask price. +38.0% return with top_50 universe.",
+    "hypothesis": "Improved theta efficiency per dollar deployed; accepts fewer but cleaner entries."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "aggressive_70d",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Best results with focused default universe (top 10 large-caps). Top_50 dilutes performance.",
+    "description": "Lower-delta variant (0.70 target) for increased leverage per dollar. +29.3% return with top_50 universe.",
+    "hypothesis": "Higher potential upside in strong trends but weaker consistency in choppy markets."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "monthly_only",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Best results with focused default universe (top 10 large-caps). Top_50 dilutes performance.",
+    "description": "Restricts all entries and rolls to monthly (3rd Friday) expirations only, 30-60 DTE. +26.1% return with top_50 universe.",
+    "hypothesis": "Improved fills and liquidity via standardised monthly strikes; fewer but higher-quality entries."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "uhl_directives_full",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Trend gates override stock selection \u2014 universe choice has minimal impact on this variant.",
+    "description": "Full Chris Uhl / OVTLYR University ruleset: monthly-only, 30-90 DTE (fixed from broken 30-60), 10/20/50 EMA trend gate, sit-in-cash when SPY bearish. Previously showed -102.7% due to DTE bug \u2014 now corrected.",
+    "hypothesis": "DTE window fix resolves entry desert caused by monthly_only + 30-60 DTE combination."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "uhl_authentic_filtered",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Best tested with top_50 \u2014 more stocks means more qualifying entries under strict filters",
+    "description": "Complete Uhl strategy (Plan M exits + trend gates) combined with all 4 signal gates (VIX < 28%, breadth > 50%, order block, sector ETF trend). Most selective variant \u2014 only enters in ideal market conditions AND exits on trend reversal/targets."
+  },
+  {
+    "strategy_id": "openclaw_stock_options",
+    "strategy_name": "OpenClaw Stock Options",
+    "variant": "legacy_replica",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Performance improves significantly with focused default universe (top 10 large-caps) vs top_50.",
+    "description": "Deep ITM call stock replacement using legacy OpenClaw parameters (0.85 delta target, 35% extrinsic max, 20-75 DTE). No trend gate. +47.1% return.",
+    "hypothesis": "Higher-delta entry and wider DTE window may improve opportunity count versus base profile."
+  },
+  {
+    "strategy_id": "openclaw_stock_options",
+    "strategy_name": "OpenClaw Stock Options",
+    "variant": "realistic_priced",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Performance improves with focused default universe (top 10 large-caps) vs top_50.",
+    "description": "OpenClaw stock-options with tighter fills (0.82 delta, 25% extrinsic max, 8% spread max, 25-60 DTE) and explicit cost overlay.",
+    "hypothesis": "Stricter parameters closer to live execution reduce over-optimism in backtests."
+  },
+  {
+    "strategy_id": "openclaw_tqqq_swing",
+    "strategy_name": "OpenClaw TQQQ Swing",
+    "variant": "legacy_replica",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Trades TQQQ (or synthetic 3x QQQ) only \u2014 not affected by stock universe selection",
+    "description": "Pullback-to-MA swing trades on TQQQ (or 3x synthetic from QQQ) under legacy assumptions. +13.7% return over 2020-2025.",
+    "hypothesis": "Momentum reversion in leveraged ETFs can generate outsized returns during trend periods."
+  },
+  {
+    "strategy_id": "openclaw_tqqq_swing",
+    "strategy_name": "OpenClaw TQQQ Swing",
+    "variant": "realistic_priced",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Trades TQQQ (or synthetic 3x QQQ) only \u2014 not affected by stock universe selection",
+    "description": "TQQQ swing strategy with tighter risk filters (10% stop, 25% target) and higher friction. -2.4% return over 2020-2025.",
+    "hypothesis": "Realistic friction assumptions expose the sensitivity of leveraged ETF swing timing."
+  },
+  {
+    "strategy_id": "openclaw_hybrid",
+    "strategy_name": "OpenClaw Hybrid",
+    "variant": "legacy_replica",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Stock leg improves with focused default universe; TQQQ leg unaffected.",
+    "description": "Blended engine: 75% stock-options leg + 25% TQQQ swing leg, legacy assumptions. +38.8% return.",
+    "hypothesis": "Diversified signal sources reduce single-strategy concentration risk."
+  },
+  {
+    "strategy_id": "openclaw_hybrid",
+    "strategy_name": "OpenClaw Hybrid",
+    "variant": "realistic_priced",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Stock leg improves with focused default universe; TQQQ leg unaffected.",
+    "description": "Blended 75/25 stock-options + TQQQ swing with realistic execution friction on both legs.",
+    "hypothesis": "Realistic blended returns; both legs face friction headwinds simultaneously."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "vix_gated",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Best with focused default universe (top 10 large-caps). Top_50 dilutes performance.",
+    "description": "Base strategy + VIX proxy gate: skips entries when SPY HV30 > 25% (panic). Result: -54.6% return \u2014 gate is too restrictive, blocking profitable 2020-2021 recovery entries.",
+    "hypothesis": "Avoiding high-volatility / panic regimes reduces drawdowns for deep-ITM call buyers."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "breadth_60",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Best with focused default universe (top 10 large-caps). Top_50 dilutes performance.",
+    "description": "Base + strict breadth gate (< 60% above MA200 = no entries). Result: -19.5%, 361 cash days. Too restrictive \u2014 blocked too many entries in 2020-2021.",
+    "hypothesis": "Trading only when most stocks are in uptrends should improve win rate and reduce 2022-style drawdowns."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "breadth_40",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Best with focused default universe (top 10 large-caps). Top_50 dilutes performance.",
+    "description": "Base + permissive breadth gate (< 40% above MA200 = no entries). Result: -2.3% \u2014 still too restrictive, 221 cash days. Breadth alone insufficient for deep-ITM calls.",
+    "hypothesis": "A looser breadth filter maintains more trade frequency while still avoiding the weakest market conditions."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "order_block_filtered",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Best with focused default universe (top 10 large-caps). Top_50 dilutes performance.",
+    "description": "Base + order block resistance gate: skips entries when price is within 3% below 30-day high. Result: +45.7% (identical to base) \u2014 large-caps in uptrends are always near highs, so gate rarely fires.",
+    "hypothesis": "Avoiding entries near recent highs reduces the chance of being caught in a resistance rejection and forced into a loss."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "sector_trend",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Best with focused default universe. Requires XLK/XLC/XLY sector ETFs in the Parquet cache \u2014 if absent, gate is inactive.",
+    "description": "Base + sector ETF trend gate (XLK/XLC/XLY must be bullish). Result: +36.5% \u2014 slightly below base. Note: sector ETFs must be in Parquet cache for gate to activate.",
+    "hypothesis": "Sector-level trend alignment provides a stronger regime filter than the individual stock trend alone."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "vix_breadth_combo",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Best with focused default universe (top 10 large-caps). Top_50 dilutes performance.",
+    "description": "VIX proxy (HV30 < 28%) + breadth (> 50% above MA200) combined market gates. Result: +2.5%, 305 cash days. Gates block the right periods but per-symbol selection still neutral.",
+    "hypothesis": "Combining two independent market-health signals should produce the best risk-adjusted returns of all stock replacement variants."
+  },
+  {
+    "strategy_id": "research_putwrite_spy",
+    "strategy_name": "Research PutWrite SPY",
+    "variant": "baseline",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY only - not affected by stock universe selection",
+    "description": "Monthly cash-secured put-writing prototype with trend and volatility gates.",
+    "hypothesis": "Systematic put-selling in favorable regimes can outperform long-only with controlled drawdown."
+  },
+  {
+    "strategy_id": "research_putwrite_spy",
+    "strategy_name": "Research PutWrite SPY",
+    "variant": "defensive",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY only - not affected by stock universe selection",
+    "description": "Lower-allocation defensive putwrite variant with tighter volatility window.",
+    "hypothesis": "Reducing notional and requiring cleaner regimes improves risk-adjusted returns."
+  },
+  {
+    "strategy_id": "research_buywrite_spy",
+    "strategy_name": "Research BuyWrite SPY",
+    "variant": "baseline",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Trades SPY only - not affected by stock universe selection",
+    "description": "Monthly covered-call overwrite prototype with trend and volatility gates.",
+    "hypothesis": "Covered-call premium harvesting in trending regimes improves return consistency."
+  },
+  {
+    "strategy_id": "research_buywrite_spy",
+    "strategy_name": "Research BuyWrite SPY",
+    "variant": "defensive",
+    "status": "active",
+    "champion": true,
+    "universe_note": "Trades SPY only - not affected by stock universe selection",
+    "description": "Defensive buywrite variant with lower premium assumptions and stricter entry conditions.",
+    "hypothesis": "Lower-yield but more selective covered-call entries may reduce large drawdowns."
+  },
+  {
+    "strategy_id": "research_collar_spy",
+    "strategy_name": "Research Collar SPY",
+    "variant": "baseline",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY only - not affected by stock universe selection",
+    "description": "Monthly collar prototype: long SPY + long put - short call.",
+    "hypothesis": "Collars can preserve upside participation while materially reducing downside tails."
+  },
+  {
+    "strategy_id": "research_collar_spy",
+    "strategy_name": "Research Collar SPY",
+    "variant": "defensive",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY only - not affected by stock universe selection",
+    "description": "Defensive collar variant with wider downside buffer.",
+    "hypothesis": "Paying more for protection improves survivability in stress regimes."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "full_filter_iv_rs_gated",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Requires top_50 universe. SPY regime block added on top of IV rank + RS gates \u2014 no new entries when SPY 10 EMA < 20 EMA.",
+    "description": "+162.4%, Sharpe 0.53, Max DD 70.6%. FAILED: SPY regime block increased drawdown vs full_filter_iv_rs (40.8%) \u2014 blocking new entries while existing positions bleed through 2022 bear market. Same failure mode as uhl_authentic.",
+    "hypothesis": "IV rank + RS already filter low-quality entries. Adding SPY regime block prevents opening positions into sustained bear markets, directly targeting the 2022 drawdown source."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "full_filter_20pos_tp30",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Requires top_50 universe. 30% profit target added to champion full_filter_20pos.",
+    "description": "+109.7%, Sharpe 0.55, Max DD 78.4%. FAILED: 30% profit target destroyed compounding \u2014 deep ITM calls need to run, early exits cut mega-winners that drove full_filter_20pos to +323.8%.",
+    "hypothesis": "Deep ITM calls up 30% have delivered most intrinsic gain. Re-entering at a cheaper IV may compound better than riding the position to expiry."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "full_filter_iv_rank_30",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Requires top_50 universe. Stricter IV rank cutoff: 30th percentile vs 40th in full_filter_iv_rank.",
+    "description": "+149.8%, Sharpe 0.47, Max DD 53.1%. FAILED: 30th percentile IV rank too selective vs 40th \u2014 returns halved with no improvement in risk metrics. 40th percentile was the sweet spot.",
+    "hypothesis": "Stricter IV selectivity finds the very cheapest options historically \u2014 fewer but higher-quality entries. Risk: trade count falls below statistical threshold."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "full_filter_monthly",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "Requires top_50 universe. Monthly-only expirations (3rd Friday, 30-90 DTE) with full 4-gate stack + IV rank.",
+    "description": "+237.7%, Sharpe 0.58, Max DD 53.3%. Partial failure: best of the new batch but significantly below full_filter_iv_rank (+302.7%). Monthly-only reduces opportunity set without improving quality enough.",
+    "hypothesis": "Monthly options deliver better fills and lower extrinsic decay early in the DTE window. IV rank gate spaces out entries enough to avoid the monthly_only entry desert problem."
+  },
+  {
+    "strategy_id": "csp",
+    "strategy_name": "Cash-Secured Put",
+    "variant": "csp_d30_pt50_roll_dte",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "top_50 universe. Best of 8 CSP variants — still significantly underperforms stock replacement.",
+    "description": "+35.4% (5yr), Sharpe 0.07, Max DD 21.5%, 87.1% win rate, 1276 trades. Best CSP variant: delta -0.30, 50% profit exit, roll at 7 DTE. The only CSP with marginally positive Sharpe. Despite high win rate, premium collected per contract is tiny relative to locked collateral (~$250 credit on $10k+ collateral = 2.5% max return per trade).",
+    "hypothesis": "Selling 30-delta puts with DTE-based roll and early profit exits cycles capital more frequently, improving annualized yield vs riding positions to expiry."
+  },
+  {
+    "strategy_id": "csp",
+    "strategy_name": "Cash-Secured Put",
+    "variant": "csp_d20_pt50_roll_delta",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "top_50 universe.",
+    "description": "+22.5% (5yr), Sharpe -0.05, Max DD 25.4%, 92.4% win rate, 1269 trades. Delta -0.20 target, 50% profit exit, roll on delta cross. High win rate but tiny credits on far OTM puts. Capital efficiency problem: collateral >> premium collected.",
+    "hypothesis": "Lower delta (safer) puts with profit exit would produce a smoother equity curve with lower drawdown."
+  },
+  {
+    "strategy_id": "csp",
+    "strategy_name": "Cash-Secured Put",
+    "variant": "csp_d20_pt50_roll_dte",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "top_50 universe.",
+    "description": "+21.9% (5yr), Sharpe -0.08, Max DD 19.0%, 90.2% win rate, 1404 trades. Lowest max drawdown of all CSP variants but still well below stock replacement. Same capital efficiency problem.",
+    "hypothesis": "DTE-based rolls on OTM puts (lower delta) with profit exits produce the most controlled risk profile of the CSP family."
+  },
+  {
+    "strategy_id": "csp",
+    "strategy_name": "Cash-Secured Put",
+    "variant": "csp_d30_pt50_roll_delta",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "top_50 universe.",
+    "description": "+21.8% (5yr), Sharpe -0.05, Max DD 25.5%, 89.6% win rate, 1040 trades. Delta -0.30, 50% profit exit, roll on delta cross. Second-worst of delta-roll variants.",
+    "hypothesis": "Higher credit at 30 delta with profit exit and delta-based roll captures best of both approaches."
+  },
+  {
+    "strategy_id": "csp",
+    "strategy_name": "Cash-Secured Put",
+    "variant": "csp_d30_ride_roll_delta",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "top_50 universe.",
+    "description": "+20.3% (5yr), Sharpe -0.07, Max DD 24.8%, 82.7% win rate, 730 trades. Riding to expiry without profit target reduces trade frequency and produces lower win rate (put occasionally goes ITM).",
+    "hypothesis": "Riding puts to expiry maximizes theta decay capture — no exit at 50% means keeping the remaining 50% of premium."
+  },
+  {
+    "strategy_id": "csp",
+    "strategy_name": "Cash-Secured Put",
+    "variant": "csp_d20_ride_roll_delta",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "top_50 universe.",
+    "description": "+19.1% (5yr), Sharpe -0.11, Max DD 21.8%, 89.9% win rate, 1072 trades. Lower delta, ride to expiry, delta roll. The 940 rolls executed indicates excessive rolling — delta threshold too tight for far OTM puts.",
+    "hypothesis": "Far OTM puts (delta -0.20) held to expiry consistently expire worthless, producing near-100% win rate with minimal capital risk per trade."
+  },
+  {
+    "strategy_id": "csp",
+    "strategy_name": "Cash-Secured Put",
+    "variant": "csp_d30_ride_roll_dte",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "top_50 universe.",
+    "description": "+17.6% (5yr), Sharpe -0.16, Max DD 19.7%, 76.4% win rate, 716 trades. Worst of the ride-to-expiry variants. 707 rolls suggest frequent DTE rollouts with poor compounding.",
+    "hypothesis": "DTE-based rolling before expiry is safer than holding through final week; should avoid assignment risk and preserve credit."
+  },
+  {
+    "strategy_id": "csp",
+    "strategy_name": "Cash-Secured Put",
+    "variant": "csp_d20_ride_roll_dte",
+    "status": "archived",
+    "champion": false,
+    "universe_note": "top_50 universe.",
+    "description": "+7.2% (5yr), Sharpe -0.36, Max DD 17.6%, 80.6% win rate, 718 trades. Worst CSP variant overall. Lower delta + ride + DTE roll = minimal premium collected per cycle + excessive rolling. Even 5yr SPY buy-and-hold outperforms this by ~10x.",
+    "hypothesis": "Conservative delta + ride-to-expiry should compound smoothly with lowest realized losses."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "LEAPS Stock Replacement",
+    "variant": "leaps_80d",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Best with focused default universe (top 10 large-caps). LEAPS requires 180-400 DTE — monthly expirations only.",
+    "description": "LEAPS-style deep ITM call at 0.80 delta with 180-400 DTE. Long hold, near-pure intrinsic value tracking, minimal theta decay. 50% profit target, 25% stop loss.",
+    "hypothesis": "Long-duration deep ITM calls track the underlying stock dollar-for-dollar with minimal extrinsic erosion. Holding for 6-12 months captures large directional moves.",
+    "entry_rules": [
+      "Target delta 0.80 (+/- 0.10)",
+      "DTE 180-400 days (monthly expirations only)",
+      "Extrinsic <= 25% of ask (LEAPS have very low extrinsic relative to intrinsic)",
+      "Open interest >= 100 (lower threshold — LEAPS have thinner markets)",
+      "Max positions: 10"
+    ],
+    "management_rules": [
+      "Take profit at +50% option value gain",
+      "Stop loss at -25% option value loss",
+      "Avoid final week of DTE (gamma risk spike)"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "LEAPS Deep ITM",
+    "variant": "leaps_85d",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Best with focused default universe (top 10 large-caps). Deeper ITM = less extrinsic, more capital required per contract.",
+    "description": "LEAPS at 0.85 delta — deeper ITM than leaps_80d for near-pure stock tracking. 180-400 DTE, 40% profit target, 20% stop loss. Near-zero extrinsic erodes minimal theta.",
+    "hypothesis": "0.85 delta LEAPS are closer to synthetic long stock with leverage. Less gamma exposure, nearly 1:1 dollar tracking, cheapest possible extrinsic cost basis.",
+    "entry_rules": [
+      "Target delta 0.85 (+/- 0.10)",
+      "DTE 180-400 days (monthly expirations only)",
+      "Extrinsic <= 15% of ask (stricter — deeper ITM should have lower extrinsic ratio)",
+      "Max positions: 10"
+    ],
+    "management_rules": [
+      "Take profit at +40% option value gain",
+      "Stop loss at -20% option value loss"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "LEAPS Gated",
+    "variant": "leaps_gated",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Requires top_50 universe. IV rank + relative strength gates require sufficient history. SPY must be in cache as benchmark.",
+    "description": "leaps_80d with all 4 market-quality gates stacked: VIX proxy + breadth + order block + sector trend, PLUS IV rank (< 40th pct) and relative strength vs SPY. Maximum quality filter for LEAPS entries.",
+    "hypothesis": "Quality gates prevent entering long-duration positions in weak market regimes. Cheap IV + relative outperformance ensures the best LEAPS risk/reward setups.",
+    "entry_rules": [
+      "All leaps_80d base rules",
+      "SPY HV30 < 28% (VIX proxy gate)",
+      "Market breadth > 50% above MA200",
+      "Price not within 3% of 30-day high (order block gate)",
+      "Sector ETF bullish trend (XLK/XLC/XLY)",
+      "IV rank in bottom 40th percentile (252-day lookback)",
+      "Stock outperforming SPY over past 90 days (relative strength)"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "LEAPS Defensive",
+    "variant": "leaps_defensive",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Requires top_50 universe. Most conservative LEAPS variant — sits in cash during bear markets.",
+    "description": "leaps_85d (0.85 delta, deepest ITM) + SPY trend block (no entries when SPY 10 EMA < 20 EMA) + IV rank gate. Sits in cash during bear markets entirely. 40% PT, 20% SL.",
+    "hypothesis": "LEAPS are expensive long-duration bets. Sitting in cash during SPY downtrends avoids holding a 12-month option through a 20%+ bear market, which would destroy most of the premium paid.",
+    "entry_rules": [
+      "All leaps_85d base rules",
+      "SPY 10 EMA > 20 EMA (bullish trend required)",
+      "IV rank in bottom 40th percentile (252-day lookback)",
+      "No entries when SPY is in a confirmed downtrend"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Wheel Strategy",
+    "variant": "wheel_d30_c30",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Uses top_50 universe. Wheel requires liquid underlying stocks with options for both CSP and covered call phases.",
+    "description": "Classic wheel strategy: sell -0.30 delta cash-secured put (30-60 DTE) → if assigned, sell 0.30 delta covered call (20-45 DTE) → if called away, repeat. Full CSP-to-covered-call cycle.",
+    "hypothesis": "The wheel collects premium at every stage: CSP premium + covered call premium. If assigned, cost basis is reduced by both premiums. Mechanical income generation on stocks you'd be willing to own.",
+    "entry_rules": [
+      "Sell put at -0.30 delta (30-60 DTE)",
+      "Collateral: strike price * 100 per contract",
+      "Max 10 CSP positions simultaneously",
+      "Only open new CSP on underlyings not currently wheeling"
+    ],
+    "management_rules": [
+      "If put assigned (stock price < strike at expiry): buy shares, begin CC phase",
+      "Sell covered call at +0.30 delta (20-45 DTE)",
+      "If call assigned (stock price > CC strike): sell shares, return to CSP phase",
+      "Repeat cycle indefinitely"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Wheel Conservative",
+    "variant": "wheel_d20_c30",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Uses top_50 universe. Lower CSP delta = less assignment probability, longer time in CSP premium-collection phase.",
+    "description": "Conservative wheel: sell -0.20 delta CSP (lower assignment probability) → if assigned, sell 0.30 delta covered call. Favors premium collection over assignment. Higher win rate on CSPs, slower capital cycling.",
+    "hypothesis": "Lower put delta reduces assignment frequency. Most premium collected from CSPs that expire worthless. Less stock ownership time = less directional exposure. Safer but lower yield than 0.30 delta.",
+    "entry_rules": [
+      "Sell put at -0.20 delta (30-60 DTE)",
+      "Lower assignment probability vs wheel_d30_c30",
+      "Max 10 CSP positions"
+    ],
+    "management_rules": [
+      "Same as wheel_d30_c30 but assignment less frequent",
+      "Covered call at 0.30 delta if assigned"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Wheel Aggressive",
+    "variant": "wheel_d40_c30",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Uses top_50 universe. Higher CSP delta = more assignment probability — accepts stock frequently.",
+    "description": "Aggressive wheel: sell -0.40 delta CSP (high assignment probability) → sell 0.30 delta covered call when assigned. Designed to own stock quickly and harvest CC premium. Higher capital utilization but more directional stock exposure.",
+    "hypothesis": "0.40 delta puts collect more premium per trade and get assigned more often. More time in the covered call phase means more CC premium harvested. Higher yield but more dependent on stock appreciation not eroding cost basis.",
+    "entry_rules": [
+      "Sell put at -0.40 delta (30-60 DTE)",
+      "High assignment probability — expect to own shares ~40% of the time",
+      "Max 10 CSP positions"
+    ],
+    "management_rules": [
+      "Same as wheel_d30_c30 but assignment more frequent",
+      "Covered call at 0.30 delta when assigned",
+      "Must size positions to accommodate frequent stock ownership"
+    ]
+  },
+  {
+    "strategy_id": "openclaw_call_credit_spread",
+    "strategy_name": "Call Credit Spread Baseline",
+    "variant": "ccs_baseline",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only — not affected by stock universe selection",
+    "description": "Bearish/neutral call credit spread: sell 4.5% OTM call, buy 5% OTM call above that. Collect premium when market stays below short strike. Mirror of PCS but on the upside.",
+    "hypothesis": "In rangebound or moderately bearish regimes, OTM calls expire worthless. Neutral market conditions produce high win rates similar to OTM put spreads in bullish regimes.",
+    "entry_rules": [
+      "HV20 in 14%-60% range (moderate vol needed for decent premium)",
+      "Stock not in strong bullish momentum (< 8% above MA50)",
+      "Short call 4.5% OTM above spot",
+      "Long call 5% above short strike (defines max loss)",
+      "Credit ~33% of spread width"
+    ],
+    "management_rules": [
+      "Take profit at 50% of credit received (min 3 days held)",
+      "Stop at 2.2x credit received or 55% of width",
+      "Close at 10 DTE (time exit)",
+      "Close if long strike breached (market rallied through full spread)"
+    ]
+  },
+  {
+    "strategy_id": "openclaw_call_credit_spread",
+    "strategy_name": "Call Credit Spread VIX Regime",
+    "variant": "ccs_vix_regime",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only — not affected by stock universe selection",
+    "description": "CCS only when volatility is elevated (HV20 > 18%). Higher vol = more expensive calls = better premium collected. Avoids entering in calm low-vol environments where call premium is thin.",
+    "hypothesis": "Elevated volatility inflates call premiums. Waiting for HV20 > 18% ensures adequate credit vs width ratio. Quality-over-quantity approach — fewer but better-priced entries.",
+    "entry_rules": [
+      "HV20 > 18% (elevated volatility required for good call premium)",
+      "HV20 < 60% (avoid panic conditions)",
+      "Stock not in strong bullish momentum (< 8% above MA50)",
+      "Short call 4.5% OTM above spot"
+    ],
+    "management_rules": [
+      "Same as ccs_baseline"
+    ]
+  },
+  {
+    "strategy_id": "openclaw_call_credit_spread",
+    "strategy_name": "Call Credit Spread Defensive",
+    "variant": "ccs_defensive",
+    "status": "active",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only — not affected by stock universe selection",
+    "description": "Conservative CCS: short call 6% OTM (lower delta ~15-20), smaller sizing, earlier exit at 12 DTE. Reduces directional risk at the cost of lower premium collected per trade.",
+    "hypothesis": "Moving the short strike further OTM reduces the probability of breaching the short strike. Lower risk per trade with more room for the market to move against the position.",
+    "entry_rules": [
+      "HV20 in 16%-55% range",
+      "Short call 6% OTM above spot (lower delta vs baseline)",
+      "Long call 5% above short strike",
+      "Smaller position sizing (0.9% risk per trade)"
+    ],
+    "management_rules": [
+      "Take profit at 45% of credit received",
+      "Stop at 2.0x credit received",
+      "Close at 12 DTE (earlier time exit than baseline)"
+    ]
+  }
+]
