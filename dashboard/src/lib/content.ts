@@ -84,18 +84,22 @@ async function readCollection<T>(
 
   for (const file of files) {
     const fullPath = path.join(dirPath, file.name);
-    const raw = await fs.readFile(fullPath, "utf8");
-    const parsed = matter(raw);
-    const fm = (parsed.data ?? {}) as Record<string, unknown>;
-    const validated = validator(fullPath, fm);
-    const fileSlug = file.name.replace(/\.md$/, "");
-    assertSlugMatchesFilename(fullPath, (validated as { slug: string }).slug, fileSlug);
-    const html = await markdownToHtml(parsed.content);
-    docs.push({
-      ...validated,
-      body: parsed.content.trim(),
-      html,
-    });
+    try {
+      const raw = await fs.readFile(fullPath, "utf8");
+      const parsed = matter(raw);
+      const fm = (parsed.data ?? {}) as Record<string, unknown>;
+      const validated = validator(fullPath, fm);
+      const fileSlug = file.name.replace(/\.md$/, "");
+      assertSlugMatchesFilename(fullPath, (validated as { slug: string }).slug, fileSlug);
+      const html = await markdownToHtml(parsed.content);
+      docs.push({
+        ...validated,
+        body: parsed.content.trim(),
+        html,
+      });
+    } catch (err) {
+      console.error(`[content] Skipping ${fullPath} — validation error:`, err);
+    }
   }
 
   return docs;
