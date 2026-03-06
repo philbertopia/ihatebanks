@@ -1,0 +1,976 @@
+[
+  {
+    "type": "glossary",
+    "slug": "assignment",
+    "title": "Assignment",
+    "summary": "Assignment is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "bid-ask-spread",
+    "title": "Bid Ask Spread",
+    "summary": "Bid Ask Spread is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "breakeven",
+    "title": "Breakeven",
+    "summary": "Breakeven is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "call-credit-spread",
+    "title": "Call Credit Spread",
+    "summary": "Call Credit Spread is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "call-option",
+    "title": "Call Option",
+    "summary": "Call Option is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "cash-secured-put",
+    "title": "Cash Secured Put",
+    "summary": "Cash Secured Put is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "covered-call",
+    "title": "Covered Call",
+    "summary": "Covered Call is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "delta",
+    "title": "Delta",
+    "summary": "Delta is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "drawdown",
+    "title": "Drawdown",
+    "summary": "Drawdown is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "early-assignment",
+    "title": "Early Assignment",
+    "summary": "Early Assignment is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "expiration-date",
+    "title": "Expiration Date",
+    "summary": "Expiration Date is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "extrinsic-value",
+    "title": "Extrinsic Value",
+    "summary": "Extrinsic Value is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "gamma",
+    "title": "Gamma",
+    "summary": "Gamma is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "historical-volatility",
+    "title": "Historical Volatility",
+    "summary": "Historical Volatility is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "implied-volatility",
+    "title": "Implied Volatility",
+    "summary": "Implied Volatility is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "intrinsic-value",
+    "title": "Intrinsic Value",
+    "summary": "Intrinsic Value is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "iv-percentile",
+    "title": "IV Percentile",
+    "summary": "IV Percentile is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "iv-rank",
+    "title": "IV Rank",
+    "summary": "IV Rank is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "liquidity",
+    "title": "Liquidity",
+    "summary": "Liquidity is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "max-loss",
+    "title": "Max Loss",
+    "summary": "Max Loss is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "max-profit",
+    "title": "Max Profit",
+    "summary": "Max Profit is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "moneyness",
+    "title": "Moneyness",
+    "summary": "Moneyness is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "open-interest",
+    "title": "Open Interest",
+    "summary": "Open Interest is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "option-contract",
+    "title": "Option Contract",
+    "summary": "Option Contract is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "out-of-sample",
+    "title": "Out of Sample",
+    "summary": "Out of Sample is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "overfitting",
+    "title": "Overfitting",
+    "summary": "Overfitting is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "position-sizing",
+    "title": "Position Sizing",
+    "summary": "Position Sizing is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "premium",
+    "title": "Premium",
+    "summary": "Premium is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "profit-factor",
+    "title": "Profit Factor",
+    "summary": "Profit Factor is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "put-credit-spread",
+    "title": "Put Credit Spread",
+    "summary": "Put Credit Spread is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "put-option",
+    "title": "Put Option",
+    "summary": "Put Option is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "rho",
+    "title": "Rho",
+    "summary": "Rho is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "risk-reward-ratio",
+    "title": "Risk Reward Ratio",
+    "summary": "Risk Reward Ratio is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "sharpe-ratio",
+    "title": "Sharpe Ratio",
+    "summary": "Sharpe Ratio is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "slippage",
+    "title": "Slippage",
+    "summary": "Slippage is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "strike-price",
+    "title": "Strike Price",
+    "summary": "Strike Price is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "theta",
+    "title": "Theta",
+    "summary": "Theta is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "vega",
+    "title": "Vega",
+    "summary": "Vega is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "walk-forward-testing",
+    "title": "Walk Forward Testing",
+    "summary": "Walk Forward Testing is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "glossary",
+    "slug": "win-rate",
+    "title": "Win Rate",
+    "summary": "Win Rate is a core options concept used in strategy setup, risk control, and performance interpretation.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "glossary",
+      "options"
+    ],
+    "estimated_minutes": 4
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-01-options-foundations",
+    "title": "Options foundations",
+    "summary": "Structured lesson 1 covering options foundations with practical links to strategy behavior.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "lesson",
+      "education"
+    ],
+    "estimated_minutes": 18
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-02-calls-and-puts-payoffs",
+    "title": "Calls and puts payoffs",
+    "summary": "Structured lesson 2 covering calls and puts payoffs with practical links to strategy behavior.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "lesson",
+      "education"
+    ],
+    "estimated_minutes": 18
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-03-moneyness-dte-intrinsic-and-extrinsic",
+    "title": "Moneyness, DTE, intrinsic and extrinsic",
+    "summary": "Structured lesson 3 covering moneyness, dte, intrinsic and extrinsic with practical links to strategy behavior.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "lesson",
+      "education"
+    ],
+    "estimated_minutes": 18
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-04-greeks-in-practice",
+    "title": "Greeks in practice",
+    "summary": "Structured lesson 4 covering greeks in practice with practical links to strategy behavior.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "lesson",
+      "education"
+    ],
+    "estimated_minutes": 22
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-05-volatility-and-iv-rank",
+    "title": "Volatility and IV rank",
+    "summary": "Structured lesson 5 covering volatility and iv rank with practical links to strategy behavior.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "lesson",
+      "education"
+    ],
+    "estimated_minutes": 22
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-06-liquidity-spreads-and-slippage",
+    "title": "Liquidity, spreads, and slippage",
+    "summary": "Structured lesson 6 covering liquidity, spreads, and slippage with practical links to strategy behavior.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "lesson",
+      "education"
+    ],
+    "estimated_minutes": 22
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-07-risk-management-basics",
+    "title": "Risk management basics",
+    "summary": "Structured lesson 7 covering risk management basics with practical links to strategy behavior.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "lesson",
+      "education"
+    ],
+    "estimated_minutes": 22
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-08-put-credit-spreads",
+    "title": "Put credit spreads",
+    "summary": "Structured lesson 8 covering put credit spreads with practical links to strategy behavior.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "lesson",
+      "education"
+    ],
+    "estimated_minutes": 22
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-09-call-credit-spreads",
+    "title": "Call credit spreads",
+    "summary": "Structured lesson 9 covering call credit spreads with practical links to strategy behavior.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "lesson",
+      "education"
+    ],
+    "estimated_minutes": 22
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-10-wheel-strategy-mechanics",
+    "title": "Wheel strategy mechanics",
+    "summary": "Structured lesson 10 covering wheel strategy mechanics with practical links to strategy behavior.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "lesson",
+      "education"
+    ],
+    "estimated_minutes": 22
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-11-intraday-options-workflow",
+    "title": "Intraday options workflow",
+    "summary": "Structured lesson 11 covering intraday options workflow with practical links to strategy behavior.",
+    "published_at": "2026-03-06",
+    "level": "advanced",
+    "tags": [
+      "lesson",
+      "education"
+    ],
+    "estimated_minutes": 25
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-12-backtesting-walk-forward-and-overfitting",
+    "title": "Backtesting, walk-forward, and overfitting",
+    "summary": "Structured lesson 12 covering backtesting, walk-forward, and overfitting with practical links to strategy behavior.",
+    "published_at": "2026-03-06",
+    "level": "advanced",
+    "tags": [
+      "lesson",
+      "education"
+    ],
+    "estimated_minutes": 25
+  },
+  {
+    "type": "articles",
+    "slug": "alpaca-execution-and-live-trading-friction",
+    "title": "Alpaca execution and live trading friction",
+    "summary": "Educational article on alpaca execution and live trading friction for readers evaluating options systems critically.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "articles",
+    "slug": "benchmarking-options-strategies-correctly",
+    "title": "Benchmarking options strategies correctly",
+    "summary": "Educational article on benchmarking options strategies correctly for readers evaluating options systems critically.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "articles",
+    "slug": "common-backtest-mistakes-in-options",
+    "title": "Common backtest mistakes in options",
+    "summary": "Educational article on common backtest mistakes in options for readers evaluating options systems critically.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "articles",
+    "slug": "drawdown-psychology-and-system-discipline",
+    "title": "Drawdown psychology and system discipline",
+    "summary": "Educational article on drawdown psychology and system discipline for readers evaluating options systems critically.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "articles",
+    "slug": "execution-realism-and-slippage-drag",
+    "title": "Execution realism and slippage drag",
+    "summary": "Educational article on execution realism and slippage drag for readers evaluating options systems critically.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "articles",
+    "slug": "from-research-to-production-playbook",
+    "title": "From research to production playbook",
+    "summary": "Educational article on from research to production playbook for readers evaluating options systems critically.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "articles",
+    "slug": "interpreting-profit-factor-in-context",
+    "title": "Interpreting profit factor in context",
+    "summary": "Educational article on interpreting profit factor in context for readers evaluating options systems critically.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "articles",
+    "slug": "reading-large-returns-responsibly",
+    "title": "Reading large returns responsibly",
+    "summary": "Educational article on reading large returns responsibly for readers evaluating options systems critically.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "articles",
+    "slug": "regime-dependence-in-premium-selling",
+    "title": "Regime dependence in premium selling",
+    "summary": "Educational article on regime dependence in premium selling for readers evaluating options systems critically.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "articles",
+    "slug": "what-oos-pass-really-means",
+    "title": "What OOS pass really means",
+    "summary": "Educational article on what oos pass really means for readers evaluating options systems critically.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "articles",
+    "slug": "wheel-versus-credit-spread-tradeoffs",
+    "title": "Wheel versus credit spread tradeoffs",
+    "summary": "Educational article on wheel versus credit spread tradeoffs for readers evaluating options systems critically.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "articles",
+    "slug": "why-volatility-filters-improve-survival",
+    "title": "Why volatility filters improve survival",
+    "summary": "Educational article on why volatility filters improve survival for readers evaluating options systems critically.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "ccs-baseline",
+    "title": "CCS Baseline Explainer",
+    "summary": "CCS Baseline Explainer covers setup rules, entries, exits, and failure modes for educational use.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "strategy-explainer",
+      "options"
+    ],
+    "estimated_minutes": 12
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "ccs-defensive",
+    "title": "CCS Defensive Explainer",
+    "summary": "CCS Defensive Explainer covers setup rules, entries, exits, and failure modes for educational use.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "strategy-explainer",
+      "options"
+    ],
+    "estimated_minutes": 12
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "intraday-baseline",
+    "title": "Intraday Baseline Explainer",
+    "summary": "Intraday Baseline Explainer covers setup rules, entries, exits, and failure modes for educational use.",
+    "published_at": "2026-03-06",
+    "level": "advanced",
+    "tags": [
+      "strategy-explainer",
+      "options"
+    ],
+    "estimated_minutes": 12
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "intraday-conservative",
+    "title": "Intraday Conservative Explainer",
+    "summary": "Intraday Conservative Explainer covers setup rules, entries, exits, and failure modes for educational use.",
+    "published_at": "2026-03-06",
+    "level": "advanced",
+    "tags": [
+      "strategy-explainer",
+      "options"
+    ],
+    "estimated_minutes": 12
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "pcs-legacy-replica",
+    "title": "PCS Legacy Replica Explainer",
+    "summary": "PCS Legacy Replica Explainer covers setup rules, entries, exits, and failure modes for educational use.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "strategy-explainer",
+      "options"
+    ],
+    "estimated_minutes": 12
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "pcs-vix-optimal",
+    "title": "PCS VIX Optimal Explainer",
+    "summary": "PCS VIX Optimal Explainer covers setup rules, entries, exits, and failure modes for educational use.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "strategy-explainer",
+      "options"
+    ],
+    "estimated_minutes": 12
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "stock-replacement-full-filter-20pos",
+    "title": "Stock Replacement Full Filter 20 Position Explainer",
+    "summary": "Stock Replacement Full Filter 20 Position Explainer covers setup rules, entries, exits, and failure modes for educational use.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "strategy-explainer",
+      "options"
+    ],
+    "estimated_minutes": 12
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "wheel-d20-c30",
+    "title": "Wheel D20 C30 Explainer",
+    "summary": "Wheel D20 C30 Explainer covers setup rules, entries, exits, and failure modes for educational use.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "strategy-explainer",
+      "options"
+    ],
+    "estimated_minutes": 12
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "wheel-d30-c30",
+    "title": "Wheel D30 C30 Explainer",
+    "summary": "Wheel D30 C30 Explainer covers setup rules, entries, exits, and failure modes for educational use.",
+    "published_at": "2026-03-06",
+    "level": "beginner",
+    "tags": [
+      "strategy-explainer",
+      "options"
+    ],
+    "estimated_minutes": 12
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "wheel-d40-c30",
+    "title": "Wheel D40 C30 Explainer",
+    "summary": "Wheel D40 C30 Explainer covers setup rules, entries, exits, and failure modes for educational use.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "strategy-explainer",
+      "options"
+    ],
+    "estimated_minutes": 12
+  }
+]
