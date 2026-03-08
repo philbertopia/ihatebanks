@@ -1,5 +1,186 @@
 [
   {
+    "type": "lessons",
+    "slug": "lesson-13-swing-call-options",
+    "title": "Swing call and put options",
+    "summary": "Learn how to trade directional long calls and puts for short-term moves. Covers momentum entry signals, in-the-money strike selection, earnings setups, and the risk management rules that separate consistent traders from gamblers.",
+    "published_at": "2026-03-08",
+    "level": "beginner",
+    "tags": [
+      "lesson",
+      "education",
+      "strategy",
+      "swing-trading"
+    ],
+    "estimated_minutes": 15
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-15-iron-condors",
+    "title": "Iron condors",
+    "summary": "Combine a put credit spread and a call credit spread to create a market-neutral income engine. Learn how iron condors profit from stagnation and how to manage a position that is attacked on two fronts.",
+    "published_at": "2026-03-08",
+    "level": "intermediate",
+    "tags": [
+      "lesson",
+      "education",
+      "strategy"
+    ],
+    "estimated_minutes": 20
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-16-regime-switching",
+    "title": "Regime switching",
+    "summary": "Strategies are not universal. A bull market strategy will destroy you in a bear market. Learn how to identify market regimes and automatically switch gears to stop fighting the trend.",
+    "published_at": "2026-03-08",
+    "level": "advanced",
+    "tags": [
+      "lesson",
+      "education",
+      "strategy",
+      "advanced"
+    ],
+    "estimated_minutes": 22
+  },
+  {
+    "type": "articles",
+    "slug": "how-long-call-leverage-really-works",
+    "title": "How long-call leverage really works",
+    "summary": "A corrective analysis of a popular stock-versus-call-option example: the leverage is real, but the math, timing risk, and loss distribution need to be framed correctly.",
+    "published_at": "2026-03-08",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "education",
+      "options-basics",
+      "risk-management",
+      "leverage"
+    ],
+    "estimated_minutes": 14
+  },
+  {
+    "type": "articles",
+    "slug": "qqq-falling-knife-pcs-research-note",
+    "title": "QQQ falling knife PCS research note",
+    "summary": "Local research note comparing the new QQQ-only falling-knife put credit spread proxy against the existing PCS variants already published in the dashboard dataset.",
+    "published_at": "2026-03-08",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "backtesting",
+      "options",
+      "qqq",
+      "validation"
+    ],
+    "estimated_minutes": 14
+  },
+  {
+    "type": "articles",
+    "slug": "regime-credit-spread-10-year-comparison",
+    "title": "Regime credit spread 10-year comparison",
+    "summary": "Local research note comparing all six regime-credit-spread variants over a continuous 2016-2025 extension built from the cache plus a filled SPY and QQQ price-history gap.",
+    "published_at": "2026-03-08",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "backtesting",
+      "regime-analysis",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 16
+  },
+  {
+    "type": "articles",
+    "slug": "regime-credit-spread-local-validation-update",
+    "title": "Regime credit spread local validation update",
+    "summary": "Local workspace documentation for the regime-switch credit spread family, including the current persisted 2020-2025 leaders and the link to the separate 10-year research comparison.",
+    "published_at": "2026-03-08",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "backtesting",
+      "regime-analysis",
+      "validation",
+      "options"
+    ],
+    "estimated_minutes": 15
+  },
+  {
+    "type": "articles",
+    "slug": "small-account-options-capital-efficiency-vs-risk",
+    "title": "Small-account options: capital efficiency versus real risk",
+    "summary": "A corrective analysis of popular \"small account\" options examples: lower buying power can help, but it does not automatically mean lower risk, better sizing, or better execution.",
+    "published_at": "2026-03-08",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "education",
+      "risk-management",
+      "small-accounts",
+      "options-basics"
+    ],
+    "estimated_minutes": 15
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "qqq-falling-knife-pcs",
+    "title": "QQQ Falling Knife PCS Explainer",
+    "summary": "A local explainer for the QQQ-only falling-knife put credit spread profile, built as a daily-rule proxy of a high-probability income trade idea.",
+    "published_at": "2026-03-08",
+    "level": "intermediate",
+    "tags": [
+      "strategy-explainer",
+      "options",
+      "qqq",
+      "premium-selling"
+    ],
+    "estimated_minutes": 12
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "regime-credit-spread-balanced",
+    "title": "Regime Credit Spread Balanced Explainer",
+    "summary": "A local explainer for the balanced regime-switch credit spread profile that rotates between bullish put spreads and bearish or neutral call spreads.",
+    "published_at": "2026-03-08",
+    "level": "intermediate",
+    "tags": [
+      "strategy-explainer",
+      "options",
+      "regime-analysis"
+    ],
+    "estimated_minutes": 13
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "regime-credit-spread-defensive",
+    "title": "Regime Credit Spread Defensive Explainer",
+    "summary": "A local explainer for the defensive regime-switch credit spread profile that uses stricter bullish filters and a lower-delta bearish call-spread template.",
+    "published_at": "2026-03-08",
+    "level": "intermediate",
+    "tags": [
+      "strategy-explainer",
+      "options",
+      "regime-analysis"
+    ],
+    "estimated_minutes": 13
+  },
+  {
+    "type": "strategy-explainers",
+    "slug": "regime-credit-spread-legacy-defensive",
+    "title": "Regime Credit Spread Legacy Defensive Explainer",
+    "summary": "A local explainer for the current leading regime-switch credit spread profile, which combines the legacy bullish PCS leg with the defensive bearish and neutral CCS leg.",
+    "published_at": "2026-03-08",
+    "level": "intermediate",
+    "tags": [
+      "strategy-explainer",
+      "options",
+      "regime-analysis"
+    ],
+    "estimated_minutes": 14
+  },
+  {
     "type": "glossary",
     "slug": "assignment",
     "title": "Assignment",
@@ -523,325 +704,376 @@
     "type": "lessons",
     "slug": "lesson-01-options-foundations",
     "title": "Options foundations",
-    "summary": "Structured lesson 1 covering options foundations with practical links to strategy behavior.",
+    "summary": "Options are not just derivatives -- they are a fundamentally different way to participate in markets. This lesson builds a complete mental model: what options are, how they work mechanically, who the participants are, what moves the price, and why selling premium is a structurally advantaged position. No jargon without explanation. No shortcuts.",
     "published_at": "2026-03-06",
     "level": "beginner",
     "tags": [
       "lesson",
-      "education"
+      "education",
+      "options-basics"
     ],
-    "estimated_minutes": 18
+    "estimated_minutes": 20
   },
   {
     "type": "lessons",
     "slug": "lesson-02-calls-and-puts-payoffs",
     "title": "Calls and puts payoffs",
-    "summary": "Structured lesson 2 covering calls and puts payoffs with practical links to strategy behavior.",
+    "summary": "Understand exactly how calls and puts make or lose money at expiration — and why the short side of these contracts is where systematic premium sellers live.",
     "published_at": "2026-03-06",
     "level": "beginner",
     "tags": [
       "lesson",
-      "education"
+      "education",
+      "options-basics"
     ],
-    "estimated_minutes": 18
+    "estimated_minutes": 14
   },
   {
     "type": "lessons",
     "slug": "lesson-03-moneyness-dte-intrinsic-and-extrinsic",
     "title": "Moneyness, DTE, intrinsic and extrinsic",
-    "summary": "Structured lesson 3 covering moneyness, dte, intrinsic and extrinsic with practical links to strategy behavior.",
+    "summary": "The four concepts that determine an option's price and how fast it decays. Understanding intrinsic vs. extrinsic value explains why premium sellers target out-of-the-money options in the 30-60 day window.",
     "published_at": "2026-03-06",
     "level": "beginner",
     "tags": [
       "lesson",
-      "education"
+      "education",
+      "options-basics"
     ],
-    "estimated_minutes": 18
+    "estimated_minutes": 15
   },
   {
     "type": "lessons",
     "slug": "lesson-04-greeks-in-practice",
     "title": "Greeks in practice",
-    "summary": "Structured lesson 4 covering greeks in practice with practical links to strategy behavior.",
+    "summary": "Delta, theta, gamma, and vega tell you how an option's price responds to everything that changes in the market. Learn what each one means for a short-premium strategy and which Greeks work for you versus against you.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "lesson",
-      "education"
+      "education",
+      "options-basics"
     ],
-    "estimated_minutes": 22
+    "estimated_minutes": 18
   },
   {
     "type": "lessons",
     "slug": "lesson-05-volatility-and-iv-rank",
     "title": "Volatility and IV rank",
-    "summary": "Structured lesson 5 covering volatility and iv rank with practical links to strategy behavior.",
+    "summary": "Implied volatility drives option prices. IV rank tells you whether options are cheap or expensive relative to their history. Knowing when to sell premium and when to wait is largely a volatility timing question.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "lesson",
-      "education"
+      "education",
+      "options-basics"
     ],
-    "estimated_minutes": 22
+    "estimated_minutes": 16
   },
   {
     "type": "lessons",
     "slug": "lesson-06-liquidity-spreads-and-slippage",
     "title": "Liquidity, spreads, and slippage",
-    "summary": "Structured lesson 6 covering liquidity, spreads, and slippage with practical links to strategy behavior.",
+    "summary": "The bid/ask spread is a tax on every trade. Slippage is invisible in theory but very real in practice. Understanding execution costs explains why strategy selection and underlying choice matter as much as the strategy logic itself.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "lesson",
-      "education"
+      "education",
+      "execution"
     ],
-    "estimated_minutes": 22
+    "estimated_minutes": 14
   },
   {
     "type": "lessons",
     "slug": "lesson-07-risk-management-basics",
     "title": "Risk management basics",
-    "summary": "Structured lesson 7 covering risk management basics with practical links to strategy behavior.",
+    "summary": "Position sizing, portfolio heat, and knowing when to stop are what separate a durable systematic strategy from one that blows up in a bad month. Risk management is not a constraint on returns — it is how returns survive.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "lesson",
-      "education"
+      "education",
+      "risk"
     ],
-    "estimated_minutes": 22
+    "estimated_minutes": 18
   },
   {
     "type": "lessons",
     "slug": "lesson-08-put-credit-spreads",
     "title": "Put credit spreads",
-    "summary": "Structured lesson 8 covering put credit spreads with practical links to strategy behavior.",
+    "summary": "The put credit spread is the core strategy on this site. Learn exactly how it is constructed, why it works, how to calculate its profit and loss at any stock price, and what the backtest results actually represent.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "lesson",
-      "education"
+      "education",
+      "strategy"
     ],
-    "estimated_minutes": 22
+    "estimated_minutes": 20
   },
   {
     "type": "lessons",
     "slug": "lesson-09-call-credit-spreads",
     "title": "Call credit spreads",
-    "summary": "Structured lesson 9 covering call credit spreads with practical links to strategy behavior.",
+    "summary": "The call credit spread is the mirror image of the put credit spread — same structure, opposite market assumption. Learn how it is built, when to use it, and how it complements put spreads in a systematic portfolio.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "lesson",
-      "education"
+      "education",
+      "strategy"
     ],
-    "estimated_minutes": 22
+    "estimated_minutes": 16
   },
   {
     "type": "lessons",
     "slug": "lesson-10-wheel-strategy-mechanics",
     "title": "Wheel strategy mechanics",
-    "summary": "Structured lesson 10 covering wheel strategy mechanics with practical links to strategy behavior.",
+    "summary": "The wheel strategy cycles between selling cash-secured puts and covered calls, collecting premium continuously whether or not you own the stock. Learn the full mechanics, when each phase activates, and what the backtests reveal about its real-world performance.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "lesson",
-      "education"
+      "education",
+      "strategy"
     ],
-    "estimated_minutes": 22
+    "estimated_minutes": 20
   },
   {
     "type": "lessons",
     "slug": "lesson-11-intraday-options-workflow",
     "title": "Intraday options workflow",
-    "summary": "Structured lesson 11 covering intraday options workflow with practical links to strategy behavior.",
+    "summary": "Same-day open-and-close options trades are a different game from multi-week credit spreads. Learn how intraday options workflows function, what makes them viable, and how the Intraday Open-Close strategy on this site is structured.",
     "published_at": "2026-03-06",
     "level": "advanced",
     "tags": [
       "lesson",
-      "education"
+      "education",
+      "strategy",
+      "execution"
     ],
-    "estimated_minutes": 25
+    "estimated_minutes": 20
   },
   {
     "type": "lessons",
     "slug": "lesson-12-backtesting-walk-forward-and-overfitting",
     "title": "Backtesting, walk-forward, and overfitting",
-    "summary": "Structured lesson 12 covering backtesting, walk-forward, and overfitting with practical links to strategy behavior.",
+    "summary": "A backtest that looks great is not enough. Learn how to read backtest results honestly, what overfitting is and why it destroys real-world performance, and how walk-forward out-of-sample validation is used on this site to test whether a strategy's edge is real.",
     "published_at": "2026-03-06",
     "level": "advanced",
     "tags": [
       "lesson",
-      "education"
+      "education",
+      "backtesting"
     ],
-    "estimated_minutes": 25
+    "estimated_minutes": 22
+  },
+  {
+    "type": "lessons",
+    "slug": "lesson-13-stock-replacement",
+    "title": "Stock replacement strategy",
+    "summary": "Why buy the stock when you can rent the upside for 20% of the cost? Learn how to use deep in-the-money call options to replicate stock ownership with defined risk and massive capital efficiency.",
+    "published_at": "2026-03-06",
+    "level": "intermediate",
+    "tags": [
+      "lesson",
+      "education",
+      "strategy"
+    ],
+    "estimated_minutes": 20
   },
   {
     "type": "articles",
     "slug": "alpaca-execution-and-live-trading-friction",
     "title": "Alpaca execution and live trading friction",
-    "summary": "Educational article on alpaca execution and live trading friction for readers evaluating options systems critically.",
+    "summary": "A practical guide for translating paper strategy logic into broker reality: orders, fills, assignment, and operational controls.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "article",
-      "options",
-      "research"
+      "alpaca",
+      "execution",
+      "live-trading",
+      "operations"
     ],
-    "estimated_minutes": 10
+    "estimated_minutes": 12
   },
   {
     "type": "articles",
     "slug": "benchmarking-options-strategies-correctly",
     "title": "Benchmarking options strategies correctly",
-    "summary": "Educational article on benchmarking options strategies correctly for readers evaluating options systems critically.",
+    "summary": "A practical framework for comparing options systems without mixing unlike risk profiles, turnover, and capital constraints.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "article",
+      "benchmarking",
+      "performance",
       "options",
-      "research"
+      "portfolio-construction"
     ],
-    "estimated_minutes": 10
+    "estimated_minutes": 12
   },
   {
     "type": "articles",
     "slug": "common-backtest-mistakes-in-options",
     "title": "Common backtest mistakes in options",
-    "summary": "Educational article on common backtest mistakes in options for readers evaluating options systems critically.",
+    "summary": "A field guide to the most frequent modeling errors in options backtests and concrete controls that reduce false confidence.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "article",
+      "backtesting",
+      "model-risk",
       "options",
-      "research"
+      "data-quality"
     ],
-    "estimated_minutes": 10
+    "estimated_minutes": 14
   },
   {
     "type": "articles",
     "slug": "drawdown-psychology-and-system-discipline",
     "title": "Drawdown psychology and system discipline",
-    "summary": "Educational article on drawdown psychology and system discipline for readers evaluating options systems critically.",
+    "summary": "How traders break their own systems during drawdowns, and how to design process controls that preserve strategy integrity under stress.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "article",
-      "options",
-      "research"
+      "drawdown",
+      "behavioral-finance",
+      "risk-management",
+      "execution-discipline"
     ],
-    "estimated_minutes": 10
+    "estimated_minutes": 13
   },
   {
     "type": "articles",
     "slug": "execution-realism-and-slippage-drag",
     "title": "Execution realism and slippage drag",
-    "summary": "Educational article on execution realism and slippage drag for readers evaluating options systems critically.",
+    "summary": "How fill assumptions and microstructure friction reshape options strategy performance, often more than signal quality itself.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "article",
-      "options",
-      "research"
+      "execution",
+      "slippage",
+      "microstructure",
+      "options"
     ],
-    "estimated_minutes": 10
+    "estimated_minutes": 13
   },
   {
     "type": "articles",
     "slug": "from-research-to-production-playbook",
     "title": "From research to production playbook",
-    "summary": "Educational article on from research to production playbook for readers evaluating options systems critically.",
+    "summary": "A staged operating framework for moving options strategies from idea to controlled deployment without skipping validation and risk governance.",
     "published_at": "2026-03-06",
-    "level": "intermediate",
+    "level": "advanced",
     "tags": [
       "article",
-      "options",
-      "research"
+      "production",
+      "workflow",
+      "risk-governance",
+      "systematic-trading"
     ],
-    "estimated_minutes": 10
+    "estimated_minutes": 15
   },
   {
     "type": "articles",
     "slug": "interpreting-profit-factor-in-context",
     "title": "Interpreting profit factor in context",
-    "summary": "Educational article on interpreting profit factor in context for readers evaluating options systems critically.",
+    "summary": "How to use profit factor correctly by pairing it with drawdown, win-rate structure, and distribution shape instead of treating it as a standalone score.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "article",
-      "options",
-      "research"
+      "profit-factor",
+      "performance-metrics",
+      "risk",
+      "strategy-analysis"
     ],
-    "estimated_minutes": 10
+    "estimated_minutes": 11
   },
   {
     "type": "articles",
     "slug": "reading-large-returns-responsibly",
     "title": "Reading large returns responsibly",
-    "summary": "Educational article on reading large returns responsibly for readers evaluating options systems critically.",
+    "summary": "A research framework for evaluating very large backtest returns without confusing headline performance with durable, deployable edge.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "article",
-      "options",
-      "research"
+      "backtesting",
+      "validation",
+      "risk-management",
+      "intraday"
     ],
-    "estimated_minutes": 10
+    "estimated_minutes": 14
   },
   {
     "type": "articles",
     "slug": "regime-dependence-in-premium-selling",
     "title": "Regime dependence in premium selling",
-    "summary": "Educational article on regime dependence in premium selling for readers evaluating options systems critically.",
+    "summary": "Why short premium strategies can look stable in one market state and fragile in another, and how to model that dependence explicitly.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "article",
+      "premium-selling",
+      "regime-analysis",
       "options",
-      "research"
+      "risk"
     ],
-    "estimated_minutes": 10
+    "estimated_minutes": 13
   },
   {
     "type": "articles",
     "slug": "what-oos-pass-really-means",
     "title": "What OOS pass really means",
-    "summary": "Educational article on what oos pass really means for readers evaluating options systems critically.",
+    "summary": "A practical interpretation guide for out-of-sample pass/fail results, with examples of why high in-sample returns can still fail validation.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "article",
-      "options",
-      "research"
+      "oos",
+      "walk-forward",
+      "model-validation",
+      "backtesting"
     ],
-    "estimated_minutes": 10
+    "estimated_minutes": 12
   },
   {
     "type": "articles",
     "slug": "wheel-versus-credit-spread-tradeoffs",
     "title": "Wheel versus credit spread tradeoffs",
-    "summary": "Educational article on wheel versus credit spread tradeoffs for readers evaluating options systems critically.",
+    "summary": "A side-by-side comparison of wheel and credit spread structures across risk profile, capital usage, operational complexity, and validation outcomes.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "article",
-      "options",
-      "research"
+      "wheel",
+      "credit-spreads",
+      "strategy-comparison",
+      "risk"
     ],
-    "estimated_minutes": 10
+    "estimated_minutes": 13
   },
   {
     "type": "articles",
     "slug": "why-volatility-filters-improve-survival",
     "title": "Why volatility filters improve survival",
-    "summary": "Educational article on why volatility filters improve survival for readers evaluating options systems critically.",
+    "summary": "How volatility-aware entry rules reduce low-quality premium trades and improve risk survivability across changing market states.",
     "published_at": "2026-03-06",
     "level": "intermediate",
     "tags": [
       "article",
-      "options",
-      "research"
+      "volatility",
+      "iv-rank",
+      "regime-filters",
+      "risk-management"
     ],
-    "estimated_minutes": 10
+    "estimated_minutes": 12
   },
   {
     "type": "strategy-explainers",
