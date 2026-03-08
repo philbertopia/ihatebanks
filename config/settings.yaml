@@ -64,3 +64,8 @@ logging:
   file: "logs/ovtlyr.log"
   max_bytes: 5242880
   backup_count: 3
+
+polygon:
+  api_key: "uYvWojojFv8NZws6ADi0On5nt6hfyvj"
+  validate_on_collect: false   # set true to validate each collect run against Polygon
+  max_delta_deviation: 0.03    # flag contracts where |delta_diff| exceeds this

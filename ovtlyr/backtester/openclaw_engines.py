@@ -1,11 +1,19 @@
 """
 OpenClaw strategy-family backtest engines.
 
-This module provides three strategy families, each with two assumptions modes:
+This module provides several strategy families, each with one or more
+assumptions modes:
   - openclaw_stock_options (legacy_replica, realistic_priced)
   - openclaw_put_credit_spread
       (legacy_replica, realistic_priced, pcs_income_plus,
-       pcs_balanced_plus, pcs_conservative_turnover)
+       pcs_balanced_plus, pcs_conservative_turnover, qqq_falling_knife)
+  - research_small_account_options
+      (spy_iron_condor_proxy, msft_bull_call_spread,
+       aapl_bull_put_45_21, aapl_long_call_low_iv)
+  - openclaw_regime_credit_spread
+      (regime_balanced, regime_defensive, regime_legacy_defensive,
+       regime_vix_baseline, regime_legacy_defensive_bear_only,
+       regime_vix_baseline_bear_only)
   - openclaw_tqqq_swing (legacy_replica, realistic_priced)
   - openclaw_hybrid (legacy_replica, realistic_priced)
 """
@@ -44,16 +52,26 @@ PUT_CREDIT_SPREAD_MODES = {
     "pcs_balanced_plus",
     "pcs_conservative_turnover",
     "pcs_vix_optimal",
+    "qqq_falling_knife",
 }
 CALL_CREDIT_SPREAD_MODES = {
     "ccs_baseline",
     "ccs_vix_regime",
     "ccs_defensive",
 }
+REGIME_CREDIT_SPREAD_MODES = {
+    "regime_balanced",
+    "regime_defensive",
+    "regime_legacy_defensive",
+    "regime_vix_baseline",
+    "regime_legacy_defensive_bear_only",
+    "regime_vix_baseline_bear_only",
+}
 INTRADAY_MODES = {
     "baseline",
     "conservative",
     "aggressive",
+    "conservative_v2",
     "oos_hardened",
     "wf_v1_liquidity_guard",
     "wf_v2_flow_strict",
@@ -62,6 +80,12 @@ INTRADAY_MODES = {
 }
 
 RESEARCH_MONTHLY_MODES = {"baseline", "defensive"}
+SMALL_ACCOUNT_RESEARCH_MODES = {
+    "spy_iron_condor_proxy",
+    "msft_bull_call_spread",
+    "aapl_bull_put_45_21",
+    "aapl_long_call_low_iv",
+}
 
 
 def _with_execution_defaults(output: EngineOutput) -> EngineOutput:
@@ -157,6 +181,14 @@ def run_openclaw_variant(
         return _with_execution_defaults(
             _run_openclaw_call_credit_spread(data, start_date, end_date, assumptions_mode)
         )
+    if strategy_id == "openclaw_regime_credit_spread":
+        if assumptions_mode not in REGIME_CREDIT_SPREAD_MODES:
+            raise ValueError(
+                f"Unsupported assumptions mode for {strategy_id}: {assumptions_mode}"
+            )
+        return _with_execution_defaults(
+            _run_openclaw_regime_credit_spread(data, start_date, end_date, assumptions_mode)
+        )
     if strategy_id == "openclaw_tqqq_swing":
         if assumptions_mode not in BASE_ASSUMPTION_MODES:
             raise ValueError(
@@ -211,6 +243,19 @@ def run_openclaw_variant(
             )
         return _with_execution_defaults(
             _run_research_collar_spy(data, start_date, end_date, assumptions_mode)
+        )
+    if strategy_id == "research_small_account_options":
+        if assumptions_mode not in SMALL_ACCOUNT_RESEARCH_MODES:
+            raise ValueError(
+                f"Unsupported assumptions mode for {strategy_id}: {assumptions_mode}"
+            )
+        return _with_execution_defaults(
+            _run_research_small_account_options(
+                data=data,
+                start_date=start_date,
+                end_date=end_date,
+                assumptions_mode=assumptions_mode,
+            )
         )
 
     raise ValueError(f"Unsupported OpenClaw strategy_id: {strategy_id}")
@@ -328,12 +373,29 @@ def _run_openclaw_put_credit_spread(
     pcs_vix_gate = bool(params.get("vix_gate_enabled", False))
     pcs_vix_min = float(params.get("vix_min_threshold", 0.0))
     pcs_vix_max = float(params.get("vix_max_threshold", 999.0))
+    allowed_symbols = [str(s).upper() for s in params.get("allowed_symbols", ["SPY", "QQQ"])]
+    require_ma200_support = bool(params.get("require_ma200_support", True))
+    require_ma20_above_ma50 = bool(params.get("require_ma20_above_ma50", True))
+    rsi_period = int(params.get("rsi_period", 14))
+    rsi_entry_max = params.get("rsi_entry_max")
+    require_selloff_trigger = bool(params.get("require_selloff_trigger", False))
+    selloff_day_return_max = float(params.get("selloff_day_return_max", 0.0))
+    selloff_3d_return_max = float(params.get("selloff_3d_return_max", 0.0))
+    require_pullback_from_high = bool(params.get("require_pullback_from_high", False))
+    pullback_lookback_days = int(params.get("pullback_lookback_days", 20))
+    pullback_from_high_min = float(params.get("pullback_from_high_min", 0.0))
 
     returns = prices.pct_change()
     hv20 = returns.rolling(20).std() * (252 ** 0.5)
     ma20 = prices.rolling(20).mean()
     ma50 = prices.rolling(50).mean()
     ma200 = prices.rolling(200).mean()
+    day_return = prices.pct_change(1)
+    return_3d = prices.pct_change(3)
+    rsi = _wilder_rsi_frame(prices, period=rsi_period)
+    prior_high = prices.shift(1).rolling(
+        pullback_lookback_days, min_periods=pullback_lookback_days
+    ).max()
 
     initial_capital = 100_000.0
     cash = initial_capital
@@ -345,6 +407,8 @@ def _run_openclaw_put_credit_spread(
     kill_state: Dict[str, Any] = {}
     macro_block_days = 0
     kill_block_days = 0
+    signal_counts_by_symbol = {symbol: 0 for symbol in allowed_symbols}
+    entry_counts_by_symbol = {symbol: 0 for symbol in allowed_symbols}
 
     all_days = list(prices.index)
     for day in all_days:
@@ -439,7 +503,9 @@ def _run_openclaw_put_credit_spread(
         if kill_state.get("active"):
             kill_block_days += 1
 
-        for symbol in ["SPY", "QQQ"]:
+        for symbol in allowed_symbols:
+            if symbol not in prices.columns:
+                continue
             if macro_blocked or kill_state.get("active"):
                 continue
             if symbol in [p["symbol"] for p in open_positions]:
@@ -453,7 +519,11 @@ def _run_openclaw_put_credit_spread(
             if pd.isna(hv20.loc[day, symbol]):
                 continue
 
-            bullish_regime = (px > float(ma200.loc[day, symbol])) and (float(ma20.loc[day, symbol]) > float(ma50.loc[day, symbol]))
+            ma200_ok = (not require_ma200_support) or (px > float(ma200.loc[day, symbol]))
+            ma20_ma50_ok = (not require_ma20_above_ma50) or (
+                float(ma20.loc[day, symbol]) > float(ma50.loc[day, symbol])
+            )
+            bullish_regime = ma200_ok and ma20_ma50_ok
             iv_proxy = float(hv20.loc[day, symbol])
             iv_regime_ok = iv_low <= iv_proxy <= iv_high
             if not (bullish_regime and iv_regime_ok):
@@ -464,6 +534,30 @@ def _run_openclaw_put_credit_spread(
                 spy_hv = float(hv20.loc[day, "SPY"]) if "SPY" in hv20.columns and pd.notna(hv20.loc[day, "SPY"]) else iv_proxy
                 if spy_hv < pcs_vix_min or spy_hv > pcs_vix_max:
                     continue
+
+            if rsi_entry_max is not None:
+                if pd.isna(rsi.loc[day, symbol]) or float(rsi.loc[day, symbol]) > float(rsi_entry_max):
+                    continue
+
+            if require_selloff_trigger:
+                day_ret = day_return.loc[day, symbol]
+                ret_3d = return_3d.loc[day, symbol]
+                selloff_ok = False
+                if pd.notna(day_ret) and float(day_ret) <= selloff_day_return_max:
+                    selloff_ok = True
+                if pd.notna(ret_3d) and float(ret_3d) <= selloff_3d_return_max:
+                    selloff_ok = True
+                if not selloff_ok:
+                    continue
+
+            if require_pullback_from_high:
+                if pd.isna(prior_high.loc[day, symbol]) or float(prior_high.loc[day, symbol]) <= 0:
+                    continue
+                pullback = 1.0 - (px / float(prior_high.loc[day, symbol]))
+                if pullback < pullback_from_high_min:
+                    continue
+
+            signal_counts_by_symbol[symbol] += 1
 
             short_strike = round(px * (1.0 - short_dist_pct), 2)
             width = round(max(px * width_pct, 1.0), 2)
@@ -507,6 +601,7 @@ def _run_openclaw_put_credit_spread(
                     "entry_hv": iv_proxy,
                 }
             )
+            entry_counts_by_symbol[symbol] += 1
 
         end_unrealized = 0.0
         for pos in open_positions:
@@ -570,6 +665,27 @@ def _run_openclaw_put_credit_spread(
     metrics["kill_switch_active"] = bool(kill_state.get("active"))
     metrics["kill_switch_expectancy_r"] = float(kill_state.get("expectancy_r", 0.0))
     trade_pnls = [float(t.get("realized_pnl", 0.0)) for t in trades]
+    component_metrics = {
+        "allowed_symbols": allowed_symbols,
+        "signal_counts_by_symbol": {
+            symbol: int(signal_counts_by_symbol.get(symbol, 0)) for symbol in allowed_symbols
+        },
+        "entry_counts_by_symbol": {
+            symbol: int(entry_counts_by_symbol.get(symbol, 0)) for symbol in allowed_symbols
+        },
+        "entry_filter_summary": {
+            "require_ma200_support": require_ma200_support,
+            "require_ma20_above_ma50": require_ma20_above_ma50,
+            "rsi_period": rsi_period,
+            "rsi_entry_max": rsi_entry_max,
+            "require_selloff_trigger": require_selloff_trigger,
+            "selloff_day_return_max": selloff_day_return_max,
+            "selloff_3d_return_max": selloff_3d_return_max,
+            "require_pullback_from_high": require_pullback_from_high,
+            "pullback_lookback_days": pullback_lookback_days,
+            "pullback_from_high_min": pullback_from_high_min,
+        },
+    }
 
     return EngineOutput(
         strategy_id="openclaw_put_credit_spread",
@@ -577,7 +693,7 @@ def _run_openclaw_put_credit_spread(
         variant=assumptions_mode,
         engine_type="openclaw_put_credit_spread_engine",
         assumptions_mode=assumptions_mode,
-        universe="SPY,QQQ",
+        universe=",".join(allowed_symbols),
         strategy_parameters={
             "variant_profile": assumptions_mode,
             "risk_pct": risk_pct,
@@ -593,11 +709,23 @@ def _run_openclaw_put_credit_spread(
             "fee_per_contract": fee_per_contract,
             "target_annual_vol": target_annual_vol,
             "max_symbol_notional_pct": max_symbol_notional_pct,
+            "allowed_symbols": allowed_symbols,
+            "require_ma200_support": require_ma200_support,
+            "require_ma20_above_ma50": require_ma20_above_ma50,
+            "rsi_period": rsi_period,
+            "rsi_entry_max": rsi_entry_max,
+            "require_selloff_trigger": require_selloff_trigger,
+            "selloff_day_return_max": selloff_day_return_max,
+            "selloff_3d_return_max": selloff_3d_return_max,
+            "require_pullback_from_high": require_pullback_from_high,
+            "pullback_lookback_days": pullback_lookback_days,
+            "pullback_from_high_min": pullback_from_high_min,
         },
         metrics=metrics,
         equity_curve=[float(v) for v in equity_curve],
         equity_points=equity_points,
         trade_pnls=trade_pnls,
+        component_metrics=component_metrics,
     )
 
 
@@ -737,6 +865,34 @@ def _put_credit_params(mode: str) -> Dict[str, Any]:
             "vix_min_threshold": 0.10,
             "vix_max_threshold": 0.40,
         },
+        "qqq_falling_knife": {
+            "risk_pct": 0.030,
+            "short_dist_pct": 0.060,
+            "width_pct": 0.040,
+            "credit_ratio": 0.18,
+            "dte_days": 28.0,
+            "take_profit_ratio": 0.50,
+            "stop_mult": 1.90,
+            "min_hold_days": 2.0,
+            "force_close_dte": 7.0,
+            "iv_low": 0.18,
+            "iv_high": 0.80,
+            "fee_per_contract": 3.0,
+            "max_qty": 2.0,
+            "target_annual_vol": 0.18,
+            "max_symbol_notional_pct": 0.18,
+            "allowed_symbols": ["QQQ"],
+            "require_ma200_support": True,
+            "require_ma20_above_ma50": False,
+            "rsi_period": 14.0,
+            "rsi_entry_max": 45.0,
+            "require_selloff_trigger": True,
+            "selloff_day_return_max": -0.010,
+            "selloff_3d_return_max": -0.020,
+            "require_pullback_from_high": True,
+            "pullback_lookback_days": 20.0,
+            "pullback_from_high_min": 0.020,
+        },
     }
     if mode not in profiles:
         raise ValueError(f"Unsupported put-credit-spread mode: {mode}")
@@ -804,6 +960,166 @@ def _call_credit_params(mode: str) -> Dict[str, Any]:
     if mode not in profiles:
         raise ValueError(f"Unsupported call-credit-spread mode: {mode}")
     return profiles[mode]
+
+
+def _regime_credit_params(mode: str) -> Dict[str, Any]:
+    profiles: Dict[str, Dict[str, Any]] = {
+        "regime_balanced": {
+            "bull_mode": "legacy_replica",
+            "bear_mode": "ccs_baseline",
+            "neutral_mode": "ccs_baseline",
+            "allow_neutral_call_entries": True,
+            "max_call_pct_above_ma50": 0.08,
+        },
+        "regime_defensive": {
+            "bull_mode": "pcs_vix_optimal",
+            "bear_mode": "ccs_defensive",
+            "neutral_mode": "ccs_defensive",
+            "allow_neutral_call_entries": True,
+            "max_call_pct_above_ma50": 0.05,
+        },
+        "regime_legacy_defensive": {
+            "bull_mode": "legacy_replica",
+            "bear_mode": "ccs_defensive",
+            "neutral_mode": "ccs_defensive",
+            "allow_neutral_call_entries": True,
+            "max_call_pct_above_ma50": 0.05,
+        },
+        "regime_vix_baseline": {
+            "bull_mode": "pcs_vix_optimal",
+            "bear_mode": "ccs_baseline",
+            "neutral_mode": "ccs_baseline",
+            "allow_neutral_call_entries": True,
+            "max_call_pct_above_ma50": 0.08,
+        },
+        "regime_legacy_defensive_bear_only": {
+            "bull_mode": "legacy_replica",
+            "bear_mode": "ccs_defensive",
+            "neutral_mode": "ccs_defensive",
+            "allow_neutral_call_entries": False,
+            "max_call_pct_above_ma50": 0.05,
+        },
+        "regime_vix_baseline_bear_only": {
+            "bull_mode": "pcs_vix_optimal",
+            "bear_mode": "ccs_baseline",
+            "neutral_mode": "ccs_baseline",
+            "allow_neutral_call_entries": False,
+            "max_call_pct_above_ma50": 0.08,
+        },
+    }
+    if mode not in profiles:
+        raise ValueError(f"Unsupported regime-credit-spread mode: {mode}")
+    return profiles[mode]
+
+
+def _classify_credit_regime(
+    px: float,
+    ma20_val: float,
+    ma50_val: float,
+    ma200_val: float,
+) -> str:
+    if not all(pd.notna(v) and float(v) > 0 for v in (px, ma20_val, ma50_val, ma200_val)):
+        return "unknown"
+    if px > ma200_val and ma20_val > ma50_val:
+        return "bull"
+    if px < ma200_val and ma20_val < ma50_val:
+        return "bear"
+    return "neutral"
+
+
+def _credit_spread_intrinsic(
+    side: str,
+    px: float,
+    short_strike: float,
+    long_strike: float,
+    width: float,
+) -> float:
+    if side == "put":
+        intrinsic = max(short_strike - px, 0.0) - max(long_strike - px, 0.0)
+    else:
+        intrinsic = max(px - short_strike, 0.0) - max(px - long_strike, 0.0)
+    return min(max(intrinsic, 0.0), width)
+
+
+def _credit_spread_adverse_move(side: str, px: float, entry_underlying: float) -> float:
+    if entry_underlying <= 0:
+        return 0.0
+    raw_move = (px - entry_underlying) / entry_underlying
+    return -raw_move if side == "put" else raw_move
+
+
+def _credit_spread_active_value(
+    pos: Dict[str, Any],
+    px: float,
+    hv_today: float,
+    day: Any,
+) -> float:
+    intrinsic = _credit_spread_intrinsic(
+        pos["side"],
+        px,
+        pos["short_strike"],
+        pos["long_strike"],
+        pos["width"],
+    )
+    dte_left = (pos["expiry_date"] - day).days
+    time_ratio = max(min(dte_left / max(pos["dte_days"], 1), 1.0), 0.0)
+    if pos["side"] == "put":
+        if px >= pos["short_strike"]:
+            spread_value = pos["credit"] * (0.5 * time_ratio)
+        elif px <= pos["long_strike"]:
+            spread_value = pos["width"] - (pos["credit"] * 0.1 * time_ratio)
+        else:
+            spread_value = intrinsic + (pos["credit"] * 0.4 * time_ratio)
+    else:
+        if px <= pos["short_strike"]:
+            spread_value = pos["credit"] * (0.5 * time_ratio)
+        elif px >= pos["long_strike"]:
+            spread_value = pos["width"] - (pos["credit"] * 0.1 * time_ratio)
+        else:
+            spread_value = intrinsic + (pos["credit"] * 0.4 * time_ratio)
+
+    vol_ratio = (hv_today / pos["entry_hv"]) if pos["entry_hv"] > 0 else 1.0
+    adverse_move = _credit_spread_adverse_move(pos["side"], px, pos["entry_underlying"])
+    spread_value += max(vol_ratio - 1.0, 0.0) * 0.25 * pos["width"]
+    spread_value += max(adverse_move - (pos["short_dist_pct"] * 0.5), 0.0) * 3.0 * pos["width"]
+    return min(max(spread_value, 0.0), pos["width"])
+
+
+def _credit_spread_mark_value(
+    pos: Dict[str, Any],
+    px: float,
+    hv_today: float,
+    day: Any,
+) -> float:
+    intrinsic = _credit_spread_intrinsic(
+        pos["side"],
+        px,
+        pos["short_strike"],
+        pos["long_strike"],
+        pos["width"],
+    )
+    dte_left = (pos["expiry_date"] - day).days
+    time_ratio = max(min(dte_left / max(pos["dte_days"], 1), 1.0), 0.0)
+    vol_ratio = (hv_today / pos["entry_hv"]) if pos["entry_hv"] > 0 else 1.0
+    adverse_move = _credit_spread_adverse_move(pos["side"], px, pos["entry_underlying"])
+    spread_value = intrinsic + (pos["credit"] * 0.3 * time_ratio)
+    spread_value += max(vol_ratio - 1.0, 0.0) * 0.20 * pos["width"]
+    spread_value += max(adverse_move - (pos["short_dist_pct"] * 0.5), 0.0) * 2.5 * pos["width"]
+    return min(max(spread_value, 0.0), pos["width"])
+
+
+def _credit_spread_period_end_value(pos: Dict[str, Any], px: float) -> float:
+    if pos["side"] == "put":
+        if px >= pos["short_strike"]:
+            return 0.0
+        if px <= pos["long_strike"]:
+            return pos["width"]
+        return pos["short_strike"] - px
+    if px <= pos["short_strike"]:
+        return 0.0
+    if px >= pos["long_strike"]:
+        return pos["width"]
+    return px - pos["short_strike"]
 
 
 def _run_openclaw_call_credit_spread(
@@ -1118,6 +1434,364 @@ def _run_openclaw_call_credit_spread(
         equity_curve=[float(v) for v in equity_curve],
         equity_points=equity_points,
         trade_pnls=trade_pnls,
+    )
+
+
+def _run_openclaw_regime_credit_spread(
+    data: pd.DataFrame,
+    start_date: date,
+    end_date: date,
+    assumptions_mode: str,
+) -> EngineOutput:
+    prices = _build_underlying_close_frame(data, start_date, end_date, symbols=["SPY", "QQQ"])
+    if prices.empty:
+        raise ValueError("No SPY/QQQ data available for openclaw_regime_credit_spread")
+
+    profile = _regime_credit_params(assumptions_mode)
+    bull_mode = str(profile["bull_mode"])
+    bear_mode = str(profile["bear_mode"])
+    neutral_mode = str(profile["neutral_mode"])
+    bull_params = _put_credit_params(bull_mode)
+    bear_params = _call_credit_params(bear_mode)
+    neutral_params = _call_credit_params(neutral_mode)
+    allow_neutral_call_entries = bool(profile.get("allow_neutral_call_entries", True))
+    max_call_pct_above_ma50 = float(profile.get("max_call_pct_above_ma50", 0.08))
+
+    returns = prices.pct_change()
+    hv20 = returns.rolling(20).std() * (252 ** 0.5)
+    ma20 = prices.rolling(20).mean()
+    ma50 = prices.rolling(50).mean()
+    ma200 = prices.rolling(200).mean()
+
+    initial_capital = 100_000.0
+    cash = initial_capital
+    open_positions: List[Dict[str, Any]] = []
+    trades: List[Dict[str, Any]] = []
+    equity_curve: List[float] = [initial_capital]
+    equity_points: List[Tuple[date, float]] = []
+    macro_events = load_macro_calendar("config/macro_calendar.yaml")
+    kill_state: Dict[str, Any] = {}
+    macro_block_days = 0
+    kill_block_days = 0
+    regime_counts = {"bull": 0, "bear": 0, "neutral": 0}
+    entry_counts = {"put": 0, "call": 0}
+
+    all_days = list(prices.index)
+    for day in all_days:
+        day_prices = prices.loc[day]
+        macro_blocked = macro_window_block(day.date() if hasattr(day, "date") else day, macro_events, 6)
+        if macro_blocked:
+            macro_block_days += 1
+
+        realized_today = 0.0
+        remaining_positions: List[Dict[str, Any]] = []
+
+        for pos in open_positions:
+            px = float(day_prices[pos["symbol"]])
+            held_days = (day - pos["entry_date"]).days
+            hv_today = (
+                float(hv20.loc[day, pos["symbol"]])
+                if pd.notna(hv20.loc[day, pos["symbol"]])
+                else pos["entry_hv"]
+            )
+            spread_value = _credit_spread_active_value(pos, px, hv_today, day)
+            pnl_per_contract = (pos["credit"] - spread_value) * 100.0
+            unrealized = pnl_per_contract * pos["qty"]
+
+            take_profit_hit = pnl_per_contract >= (pos["credit"] * 100.0 * pos["take_profit_ratio"])
+            stop_hit = spread_value >= max((pos["credit"] * pos["stop_mult"]), (pos["width"] * 0.55))
+            if pos["side"] == "put":
+                breach = px <= pos["long_strike"]
+            else:
+                breach = px >= pos["long_strike"]
+            dte_left = (pos["expiry_date"] - day).days
+            time_exit = dte_left <= pos["force_close_dte"]
+            expiry_exit = day >= pos["expiry_date"]
+
+            should_close = False
+            reason = "hold"
+            if take_profit_hit and held_days >= pos["min_hold_days"]:
+                should_close = True
+                reason = "take_profit"
+            elif stop_hit:
+                should_close = True
+                reason = "stop_loss"
+            elif breach:
+                should_close = True
+                reason = "long_strike_breach"
+            elif time_exit:
+                should_close = True
+                reason = "time_exit"
+            elif expiry_exit:
+                should_close = True
+                reason = "expiry"
+
+            if should_close:
+                fees = pos["fee_per_contract"] * pos["qty"]
+                realized = unrealized - fees
+                realized_today += realized
+                trades.append(
+                    {
+                        "underlying": pos["symbol"],
+                        "entry_date": pos["entry_date"].isoformat(),
+                        "close_date": day.isoformat(),
+                        "entry_price": pos["credit"],
+                        "close_price": spread_value,
+                        "qty": pos["qty"],
+                        "realized_pnl": round(realized, 4),
+                        "close_reason": reason,
+                        "spread_side": pos["side"],
+                        "entry_regime": pos["entry_regime"],
+                        "profile_mode": pos["profile_mode"],
+                    }
+                )
+            else:
+                remaining_positions.append(pos)
+
+        open_positions = remaining_positions
+        cash += realized_today
+        kill_state = kill_switch_state(
+            recent_trades=trades,
+            lookback_trades=30,
+            expectancy_floor_r=-0.15,
+            cooldown_days=5,
+            today=day.date() if hasattr(day, "date") else day,
+            existing_state=kill_state,
+        )
+        if kill_state.get("active"):
+            kill_block_days += 1
+
+        for symbol in ["SPY", "QQQ"]:
+            if macro_blocked or kill_state.get("active"):
+                continue
+            if symbol in [p["symbol"] for p in open_positions]:
+                continue
+
+            px = float(day_prices[symbol])
+            if not (pd.notna(px) and px > 0):
+                continue
+            if (
+                pd.isna(ma200.loc[day, symbol])
+                or pd.isna(ma50.loc[day, symbol])
+                or pd.isna(ma20.loc[day, symbol])
+                or pd.isna(hv20.loc[day, symbol])
+            ):
+                continue
+
+            ma20_val = float(ma20.loc[day, symbol])
+            ma50_val = float(ma50.loc[day, symbol])
+            ma200_val = float(ma200.loc[day, symbol])
+            regime = _classify_credit_regime(px, ma20_val, ma50_val, ma200_val)
+            if regime == "unknown":
+                continue
+            regime_counts[regime] += 1
+
+            params: Optional[Dict[str, Any]] = None
+            side = ""
+            profile_mode = ""
+            if regime == "bull":
+                side = "put"
+                params = bull_params
+                profile_mode = bull_mode
+            elif regime == "bear":
+                side = "call"
+                params = bear_params
+                profile_mode = bear_mode
+            elif allow_neutral_call_entries:
+                side = "call"
+                params = neutral_params
+                profile_mode = neutral_mode
+            if not params:
+                continue
+
+            iv_proxy = float(hv20.loc[day, symbol])
+            if not (float(params["iv_low"]) <= iv_proxy <= float(params["iv_high"])):
+                continue
+
+            if side == "put" and bool(params.get("vix_gate_enabled", False)):
+                spy_hv = (
+                    float(hv20.loc[day, "SPY"])
+                    if "SPY" in hv20.columns and pd.notna(hv20.loc[day, "SPY"])
+                    else iv_proxy
+                )
+                if spy_hv < float(params.get("vix_min_threshold", 0.0)):
+                    continue
+                if spy_hv > float(params.get("vix_max_threshold", 999.0)):
+                    continue
+
+            if side == "call" and pd.notna(ma50_val) and ma50_val > 0:
+                pct_above_ma50 = (px - ma50_val) / ma50_val
+                if pct_above_ma50 > max_call_pct_above_ma50:
+                    continue
+
+            short_dist_pct = float(params["short_dist_pct"])
+            width_pct = float(params["width_pct"])
+            credit_ratio = float(params["credit_ratio"])
+            dte_days = int(params["dte_days"])
+            take_profit_ratio = float(params["take_profit_ratio"])
+            stop_mult = float(params["stop_mult"])
+            min_hold_days = int(params["min_hold_days"])
+            force_close_dte = int(params["force_close_dte"])
+            fee_per_contract = float(params["fee_per_contract"])
+            max_qty = int(params["max_qty"])
+            target_annual_vol = float(params.get("target_annual_vol", 0.18))
+            max_symbol_notional_pct = float(params.get("max_symbol_notional_pct", 0.20))
+
+            short_strike = round(px * (1.0 - short_dist_pct), 2) if side == "put" else round(px * (1.0 + short_dist_pct), 2)
+            width = round(max(px * width_pct, 1.0), 2)
+            long_strike = round(short_strike - width, 2) if side == "put" else round(short_strike + width, 2)
+            credit = round(width * credit_ratio, 2)
+
+            max_loss_per_contract = max((width - credit) * 100.0, 1.0)
+            qty_risk = int((cash * float(params["risk_pct"])) // max_loss_per_contract)
+            qty_vol = vol_target_contracts(
+                equity=cash,
+                option_price=max(credit, 0.25),
+                underlying_annual_vol=max(iv_proxy, 0.05),
+                target_annual_vol=target_annual_vol,
+                max_contracts=max_qty,
+            )
+            qty = max(1, min(qty_risk, qty_vol, max_qty))
+            qty = cap_symbol_notional(
+                contracts=qty,
+                option_price=max(short_strike, px),
+                equity=cash,
+                max_symbol_notional_pct=max_symbol_notional_pct,
+            )
+            qty = max(1, min(qty, max_qty))
+
+            open_positions.append(
+                {
+                    "symbol": symbol,
+                    "side": side,
+                    "entry_date": day,
+                    "expiry_date": day + timedelta(days=dte_days),
+                    "dte_days": dte_days,
+                    "short_strike": short_strike,
+                    "long_strike": long_strike,
+                    "width": width,
+                    "credit": credit,
+                    "qty": qty,
+                    "take_profit_ratio": take_profit_ratio,
+                    "stop_mult": stop_mult,
+                    "min_hold_days": min_hold_days,
+                    "force_close_dte": force_close_dte,
+                    "entry_underlying": px,
+                    "entry_hv": iv_proxy,
+                    "short_dist_pct": short_dist_pct,
+                    "fee_per_contract": fee_per_contract,
+                    "entry_regime": regime,
+                    "profile_mode": profile_mode,
+                }
+            )
+            entry_counts[side] += 1
+
+        end_unrealized = 0.0
+        for pos in open_positions:
+            px = float(day_prices[pos["symbol"]])
+            hv_today = (
+                float(hv20.loc[day, pos["symbol"]])
+                if pd.notna(hv20.loc[day, pos["symbol"]])
+                else pos["entry_hv"]
+            )
+            spread_value = _credit_spread_mark_value(pos, px, hv_today, day)
+            pnl_per_contract = (pos["credit"] - spread_value) * 100.0
+            end_unrealized += pnl_per_contract * pos["qty"]
+
+        equity = cash + end_unrealized
+        equity_curve.append(float(equity))
+        equity_points.append((day, float(equity)))
+
+    if open_positions:
+        last_day = all_days[-1]
+        day_prices = prices.loc[last_day]
+        realized_tail = 0.0
+        for pos in open_positions:
+            px = float(day_prices[pos["symbol"]])
+            spread_value = _credit_spread_period_end_value(pos, px)
+            pnl_per_contract = (pos["credit"] - spread_value) * 100.0
+            realized = (pnl_per_contract * pos["qty"]) - (pos["fee_per_contract"] * pos["qty"])
+            realized_tail += realized
+            trades.append(
+                {
+                    "underlying": pos["symbol"],
+                    "entry_date": pos["entry_date"].isoformat(),
+                    "close_date": last_day.isoformat(),
+                    "entry_price": pos["credit"],
+                    "close_price": spread_value,
+                    "qty": pos["qty"],
+                    "realized_pnl": round(realized, 4),
+                    "close_reason": "period_end",
+                    "spread_side": pos["side"],
+                    "entry_regime": pos["entry_regime"],
+                    "profile_mode": pos["profile_mode"],
+                }
+            )
+        cash += realized_tail
+        if equity_curve:
+            equity_curve[-1] = float(cash)
+            if equity_points:
+                equity_points[-1] = (equity_points[-1][0], float(cash))
+
+    metrics = compute_metrics(trades, equity_curve)
+    metrics["rolls_executed"] = 0
+    metrics["trading_days"] = len(prices.index)
+    metrics["macro_block_days"] = macro_block_days
+    metrics["kill_switch_block_days"] = kill_block_days
+    metrics["kill_switch_active"] = bool(kill_state.get("active"))
+    metrics["kill_switch_expectancy_r"] = float(kill_state.get("expectancy_r", 0.0))
+    metrics["put_entries"] = int(entry_counts["put"])
+    metrics["call_entries"] = int(entry_counts["call"])
+    metrics["bullish_regime_days"] = int(regime_counts["bull"])
+    metrics["bearish_regime_days"] = int(regime_counts["bear"])
+    metrics["neutral_regime_days"] = int(regime_counts["neutral"])
+    trade_pnls = [float(t.get("realized_pnl", 0.0)) for t in trades]
+
+    closed_put_trades = sum(1 for t in trades if t.get("spread_side") == "put")
+    closed_call_trades = sum(1 for t in trades if t.get("spread_side") == "call")
+    component_metrics = {
+        "bull_profile_mode": bull_mode,
+        "bear_profile_mode": bear_mode,
+        "neutral_profile_mode": neutral_mode,
+        "allow_neutral_call_entries": allow_neutral_call_entries,
+        "entry_counts": {
+            "put": int(entry_counts["put"]),
+            "call": int(entry_counts["call"]),
+        },
+        "closed_trade_counts": {
+            "put": int(closed_put_trades),
+            "call": int(closed_call_trades),
+        },
+        "regime_days": {
+            "bull": int(regime_counts["bull"]),
+            "bear": int(regime_counts["bear"]),
+            "neutral": int(regime_counts["neutral"]),
+        },
+    }
+
+    return EngineOutput(
+        strategy_id="openclaw_regime_credit_spread",
+        strategy_name="OpenClaw Regime Credit Spread",
+        variant=assumptions_mode,
+        engine_type="openclaw_regime_credit_spread_engine",
+        assumptions_mode=assumptions_mode,
+        universe="SPY,QQQ",
+        strategy_parameters={
+            "variant_profile": assumptions_mode,
+            "bull_profile_mode": bull_mode,
+            "bear_profile_mode": bear_mode,
+            "neutral_profile_mode": neutral_mode,
+            "allow_neutral_call_entries": allow_neutral_call_entries,
+            "max_call_pct_above_ma50": max_call_pct_above_ma50,
+            "bull_params": bull_params,
+            "bear_params": bear_params,
+            "neutral_params": neutral_params,
+        },
+        metrics=metrics,
+        equity_curve=[float(v) for v in equity_curve],
+        equity_points=equity_points,
+        trade_pnls=trade_pnls,
+        component_metrics=component_metrics,
     )
 
 
@@ -1444,6 +2118,1373 @@ def _option_mark_put(
     intrinsic = max(strike - px, 0.0)
     t_ratio = max(min(dte_left / max(dte_total, 1), 1.0), 0.0)
     return max(intrinsic + (max(time_value_at_entry, 0.0) * t_ratio), 0.01)
+
+
+def _run_research_small_account_options(
+    data: pd.DataFrame,
+    start_date: date,
+    end_date: date,
+    assumptions_mode: str,
+) -> EngineOutput:
+    if assumptions_mode == "spy_iron_condor_proxy":
+        return _run_research_spy_iron_condor_proxy(data, start_date, end_date)
+    if assumptions_mode == "msft_bull_call_spread":
+        return _run_research_msft_bull_call_spread(data, start_date, end_date)
+    if assumptions_mode == "aapl_bull_put_45_21":
+        return _run_research_aapl_bull_put_45_21(data, start_date, end_date)
+    if assumptions_mode == "aapl_long_call_low_iv":
+        return _run_research_aapl_long_call_low_iv(data, start_date, end_date)
+    raise ValueError(
+        f"Unsupported assumptions mode for research_small_account_options: {assumptions_mode}"
+    )
+
+
+def _run_research_spy_iron_condor_proxy(
+    data: pd.DataFrame,
+    start_date: date,
+    end_date: date,
+) -> EngineOutput:
+    frame = _prepare_option_research_frame(data, start_date, end_date, symbols=["SPY"])
+    if frame.empty:
+        raise ValueError("No SPY option-chain data available for research_small_account_options")
+
+    prices = _build_underlying_close_frame(data, start_date, end_date, symbols=["SPY"])
+    if prices.empty or "SPY" not in prices.columns:
+        raise ValueError("No SPY price data available for research_small_account_options")
+
+    close = prices["SPY"].astype(float).dropna()
+    hv20 = close.pct_change().rolling(20).std() * (252 ** 0.5)
+    ma20 = close.rolling(20).mean()
+    ma50 = close.rolling(50).mean()
+    grouped = {d: g.copy() for d, g in frame.groupby("date")}
+
+    initial_capital = 100_000.0
+    cash = initial_capital
+    equity_curve: List[float] = [initial_capital]
+    equity_points: List[Tuple[date, float]] = []
+    trades: List[Dict[str, Any]] = []
+    position: Optional[Dict[str, Any]] = None
+    entry_risks: List[float] = []
+    entry_credits: List[float] = []
+
+    fee_per_leg = 1.0
+    target_profit_ratio = 0.50
+    stop_loss_mult = 2.0
+    force_close_dte = 21
+    min_hold_days = 3
+
+    for day in close.index:
+        px = float(close.loc[day])
+        day_slice = grouped.get(day, pd.DataFrame())
+
+        if position is not None:
+            current_close_cost = _condor_close_cost_dollars(position, day_slice, day)
+            dte_left = max((position["expiry_date"] - day).days, 0)
+            held_days = (day - position["entry_date"]).days
+            take_profit_hit = (position["entry_credit_dollars"] - current_close_cost) >= (
+                position["entry_credit_dollars"] * target_profit_ratio
+            )
+            stop_hit = current_close_cost >= (
+                position["entry_credit_dollars"] * stop_loss_mult
+            )
+            breach = px <= position["short_put"]["strike"] or px >= position["short_call"]["strike"]
+            time_exit = dte_left <= force_close_dte
+            expiry_exit = dte_left <= 0
+
+            should_close = False
+            reason = "hold"
+            if take_profit_hit and held_days >= min_hold_days:
+                should_close = True
+                reason = "take_profit"
+            elif stop_hit:
+                should_close = True
+                reason = "stop_loss"
+            elif breach:
+                should_close = True
+                reason = "short_strike_breach"
+            elif time_exit:
+                should_close = True
+                reason = "time_exit"
+            elif expiry_exit:
+                should_close = True
+                reason = "expiry"
+
+            if should_close:
+                exit_fees = fee_per_leg * 4.0
+                cash -= current_close_cost + exit_fees
+                realized = (
+                    position["entry_credit_dollars"]
+                    - current_close_cost
+                    - position["entry_fees_dollars"]
+                    - exit_fees
+                )
+                trades.append(
+                    {
+                        "underlying": "SPY",
+                        "entry_date": position["entry_date"].isoformat(),
+                        "close_date": day.isoformat(),
+                        "entry_price": round(position["entry_credit_dollars"] / 100.0, 4),
+                        "close_price": round(current_close_cost / 100.0, 4),
+                        "qty": 1,
+                        "realized_pnl": round(realized, 4),
+                        "close_reason": reason,
+                    }
+                )
+                position = None
+
+        if position is None:
+            hv_ok = pd.notna(hv20.loc[day]) and 0.08 <= float(hv20.loc[day]) <= 0.35
+            trend_ok = pd.notna(ma20.loc[day]) and abs((px / max(float(ma20.loc[day]), 1e-6)) - 1.0) <= 0.05
+            if hv_ok and trend_ok and not day_slice.empty:
+                candidate = _select_spy_iron_condor_proxy(day_slice)
+                if candidate is not None:
+                    cash += candidate["entry_credit_dollars"] - candidate["entry_fees_dollars"]
+                    position = {
+                        **candidate,
+                        "entry_date": day,
+                    }
+                    entry_risks.append(candidate["max_risk_dollars"])
+                    entry_credits.append(candidate["entry_credit_dollars"])
+
+        if position is None:
+            equity = cash
+        else:
+            current_close_cost = _condor_close_cost_dollars(position, day_slice, day)
+            equity = cash - current_close_cost
+
+        equity_curve.append(float(equity))
+        equity_points.append((day, float(equity)))
+
+    if position is not None and equity_points:
+        last_day = equity_points[-1][0]
+        day_slice = grouped.get(last_day, pd.DataFrame())
+        current_close_cost = _condor_close_cost_dollars(position, day_slice, last_day)
+        exit_fees = fee_per_leg * 4.0
+        cash -= current_close_cost + exit_fees
+        realized = (
+            position["entry_credit_dollars"]
+            - current_close_cost
+            - position["entry_fees_dollars"]
+            - exit_fees
+        )
+        trades.append(
+            {
+                "underlying": "SPY",
+                "entry_date": position["entry_date"].isoformat(),
+                "close_date": last_day.isoformat(),
+                "entry_price": round(position["entry_credit_dollars"] / 100.0, 4),
+                "close_price": round(current_close_cost / 100.0, 4),
+                "qty": 1,
+                "realized_pnl": round(realized, 4),
+                "close_reason": "period_end",
+            }
+        )
+        equity_curve[-1] = float(cash)
+        equity_points[-1] = (last_day, float(cash))
+
+    metrics = compute_metrics(trades, equity_curve)
+    metrics["rolls_executed"] = 0
+    metrics["trading_days"] = len(close.index)
+    metrics["avg_entry_credit"] = round(sum(entry_credits) / len(entry_credits), 4) if entry_credits else 0.0
+    metrics["avg_max_risk"] = round(sum(entry_risks) / len(entry_risks), 4) if entry_risks else 0.0
+
+    trade_pnls = _closed_trade_pnls(trades)
+    component_metrics = {
+        "structure": "iron_condor_proxy",
+        "entries": len(entry_credits),
+        "avg_entry_credit": round(sum(entry_credits) / len(entry_credits), 4) if entry_credits else 0.0,
+        "avg_max_risk": round(sum(entry_risks) / len(entry_risks), 4) if entry_risks else 0.0,
+    }
+
+    return EngineOutput(
+        strategy_id="research_small_account_options",
+        strategy_name="Research Small Account Options",
+        variant="spy_iron_condor_proxy",
+        engine_type="research_small_account_options_engine",
+        assumptions_mode="spy_iron_condor_proxy",
+        universe="SPY",
+        strategy_parameters={
+            "structure": "iron_condor_proxy",
+            "target_dte_range": [30, 60],
+            "short_put_delta_range": [-0.25, -0.08],
+            "short_call_delta_range": [0.08, 0.25],
+            "max_risk_dollars": 1000.0,
+            "fee_per_leg": fee_per_leg,
+        },
+        metrics=metrics,
+        equity_curve=[float(v) for v in equity_curve],
+        equity_points=equity_points,
+        trade_pnls=trade_pnls,
+        component_metrics=component_metrics,
+    )
+
+
+def _run_research_msft_bull_call_spread(
+    data: pd.DataFrame,
+    start_date: date,
+    end_date: date,
+) -> EngineOutput:
+    frame = _prepare_option_research_frame(data, start_date, end_date, symbols=["MSFT"])
+    if frame.empty:
+        raise ValueError("No MSFT option-chain data available for research_small_account_options")
+
+    prices = _build_underlying_close_frame(data, start_date, end_date, symbols=["MSFT"])
+    if prices.empty or "MSFT" not in prices.columns:
+        raise ValueError("No MSFT price data available for research_small_account_options")
+
+    close = prices["MSFT"].astype(float).dropna()
+    hv20 = close.pct_change().rolling(20).std() * (252 ** 0.5)
+    ma20 = close.rolling(20).mean()
+    ma50 = close.rolling(50).mean()
+    grouped = {d: g.copy() for d, g in frame.groupby("date")}
+
+    initial_capital = 100_000.0
+    cash = initial_capital
+    equity_curve: List[float] = [initial_capital]
+    equity_points: List[Tuple[date, float]] = []
+    trades: List[Dict[str, Any]] = []
+    position: Optional[Dict[str, Any]] = None
+    entry_debits: List[float] = []
+    max_gains: List[float] = []
+
+    fee_per_leg = 1.0
+    force_close_dte = 14
+    min_hold_days = 3
+
+    for day in close.index:
+        px = float(close.loc[day])
+        day_slice = grouped.get(day, pd.DataFrame())
+
+        if position is not None:
+            current_value = _bull_call_spread_close_value_dollars(position, day_slice, day)
+            dte_left = max((position["expiry_date"] - day).days, 0)
+            held_days = (day - position["entry_date"]).days
+            take_profit_hit = current_value >= (
+                position["entry_debit_dollars"] + (position["max_gain_dollars"] * 0.60)
+            )
+            stop_hit = current_value <= (position["entry_debit_dollars"] * 0.55)
+            bearish_break = (
+                pd.notna(ma20.loc[day])
+                and pd.notna(ma50.loc[day])
+                and (
+                    px < float(ma50.loc[day])
+                    or float(ma20.loc[day]) < float(ma50.loc[day])
+                )
+            )
+            time_exit = dte_left <= force_close_dte
+            expiry_exit = dte_left <= 0
+
+            should_close = False
+            reason = "hold"
+            if take_profit_hit and held_days >= min_hold_days:
+                should_close = True
+                reason = "take_profit"
+            elif stop_hit:
+                should_close = True
+                reason = "stop_loss"
+            elif bearish_break and held_days >= min_hold_days:
+                should_close = True
+                reason = "trend_break"
+            elif time_exit:
+                should_close = True
+                reason = "time_exit"
+            elif expiry_exit:
+                should_close = True
+                reason = "expiry"
+
+            if should_close:
+                exit_fees = fee_per_leg * 2.0
+                cash += current_value - exit_fees
+                realized = (
+                    current_value
+                    - position["entry_debit_dollars"]
+                    - position["entry_fees_dollars"]
+                    - exit_fees
+                )
+                trades.append(
+                    {
+                        "underlying": "MSFT",
+                        "entry_date": position["entry_date"].isoformat(),
+                        "close_date": day.isoformat(),
+                        "entry_price": round(position["entry_debit_dollars"] / 100.0, 4),
+                        "close_price": round(current_value / 100.0, 4),
+                        "qty": 1,
+                        "realized_pnl": round(realized, 4),
+                        "close_reason": reason,
+                    }
+                )
+                position = None
+
+        if position is None:
+            bullish_ok = (
+                pd.notna(ma20.loc[day])
+                and pd.notna(ma50.loc[day])
+                and px > float(ma20.loc[day])
+                and float(ma20.loc[day]) > float(ma50.loc[day])
+            )
+            hv_ok = pd.notna(hv20.loc[day]) and 0.08 <= float(hv20.loc[day]) <= 0.50
+            if bullish_ok and hv_ok and not day_slice.empty:
+                candidate = _select_msft_bull_call_spread(day_slice)
+                if candidate is not None:
+                    cash -= candidate["entry_debit_dollars"] + candidate["entry_fees_dollars"]
+                    position = {
+                        **candidate,
+                        "entry_date": day,
+                    }
+                    entry_debits.append(candidate["entry_debit_dollars"])
+                    max_gains.append(candidate["max_gain_dollars"])
+
+        if position is None:
+            equity = cash
+        else:
+            current_value = _bull_call_spread_close_value_dollars(position, day_slice, day)
+            equity = cash + current_value
+
+        equity_curve.append(float(equity))
+        equity_points.append((day, float(equity)))
+
+    if position is not None and equity_points:
+        last_day = equity_points[-1][0]
+        day_slice = grouped.get(last_day, pd.DataFrame())
+        current_value = _bull_call_spread_close_value_dollars(position, day_slice, last_day)
+        exit_fees = fee_per_leg * 2.0
+        cash += current_value - exit_fees
+        realized = (
+            current_value
+            - position["entry_debit_dollars"]
+            - position["entry_fees_dollars"]
+            - exit_fees
+        )
+        trades.append(
+            {
+                "underlying": "MSFT",
+                "entry_date": position["entry_date"].isoformat(),
+                "close_date": last_day.isoformat(),
+                "entry_price": round(position["entry_debit_dollars"] / 100.0, 4),
+                "close_price": round(current_value / 100.0, 4),
+                "qty": 1,
+                "realized_pnl": round(realized, 4),
+                "close_reason": "period_end",
+            }
+        )
+        equity_curve[-1] = float(cash)
+        equity_points[-1] = (last_day, float(cash))
+
+    metrics = compute_metrics(trades, equity_curve)
+    metrics["rolls_executed"] = 0
+    metrics["trading_days"] = len(close.index)
+    metrics["avg_entry_debit"] = round(sum(entry_debits) / len(entry_debits), 4) if entry_debits else 0.0
+    metrics["avg_max_gain"] = round(sum(max_gains) / len(max_gains), 4) if max_gains else 0.0
+
+    trade_pnls = _closed_trade_pnls(trades)
+    component_metrics = {
+        "structure": "bull_call_spread",
+        "entries": len(entry_debits),
+        "avg_entry_debit": round(sum(entry_debits) / len(entry_debits), 4) if entry_debits else 0.0,
+        "avg_max_gain": round(sum(max_gains) / len(max_gains), 4) if max_gains else 0.0,
+    }
+
+    return EngineOutput(
+        strategy_id="research_small_account_options",
+        strategy_name="Research Small Account Options",
+        variant="msft_bull_call_spread",
+        engine_type="research_small_account_options_engine",
+        assumptions_mode="msft_bull_call_spread",
+        universe="MSFT",
+        strategy_parameters={
+            "structure": "bull_call_spread",
+            "target_dte_range": [30, 60],
+            "long_delta_range": [0.50, 0.75],
+            "short_delta_range": [0.20, 0.45],
+            "max_debit_dollars": 1000.0,
+            "fee_per_leg": fee_per_leg,
+        },
+        metrics=metrics,
+        equity_curve=[float(v) for v in equity_curve],
+        equity_points=equity_points,
+        trade_pnls=trade_pnls,
+        component_metrics=component_metrics,
+    )
+
+
+def _run_research_aapl_bull_put_45_21(
+    data: pd.DataFrame,
+    start_date: date,
+    end_date: date,
+) -> EngineOutput:
+    frame = _prepare_option_research_frame(data, start_date, end_date, symbols=["AAPL"])
+    if frame.empty:
+        raise ValueError("No AAPL option-chain data available for research_small_account_options")
+
+    prices = _build_underlying_close_frame(data, start_date, end_date, symbols=["AAPL"])
+    if prices.empty or "AAPL" not in prices.columns:
+        raise ValueError("No AAPL price data available for research_small_account_options")
+
+    close = prices["AAPL"].astype(float).dropna()
+    ma20 = close.rolling(20).mean()
+    ma50 = close.rolling(50).mean()
+    ma200 = close.rolling(200).mean()
+    prior_20d_low = close.shift(1).rolling(20, min_periods=20).min()
+    iv_percentile = _build_daily_iv_percentile(frame, "AAPL", min_dte=30, max_dte=60, lookback_days=252)
+    grouped = {d: g.copy() for d, g in frame.groupby("date")}
+
+    initial_capital = 100_000.0
+    cash = initial_capital
+    equity_curve: List[float] = [initial_capital]
+    equity_points: List[Tuple[date, float]] = []
+    trades: List[Dict[str, Any]] = []
+    position: Optional[Dict[str, Any]] = None
+    entry_credits: List[float] = []
+    entry_risks: List[float] = []
+    entry_ivps: List[float] = []
+    entry_pops: List[float] = []
+
+    fee_per_leg = 1.0
+    stop_loss_mult = 2.0
+    force_close_dte = 21
+    min_hold_days = 3
+
+    for day in close.index:
+        px = float(close.loc[day])
+        day_slice = grouped.get(day, pd.DataFrame())
+
+        if position is not None:
+            current_close_cost = _bull_put_spread_close_cost_dollars(position, day_slice, day)
+            dte_left = max((position["expiry_date"] - day).days, 0)
+            held_days = (day - position["entry_date"]).days
+            trend_break = (
+                held_days >= min_hold_days
+                and pd.notna(ma50.loc[day])
+                and px < float(ma50.loc[day])
+            )
+            stop_hit = current_close_cost >= (position["entry_credit_dollars"] * stop_loss_mult)
+            breach = px <= position["short_put"]["strike"]
+            time_exit = dte_left <= force_close_dte
+            expiry_exit = dte_left <= 0
+
+            should_close = False
+            reason = "hold"
+            if stop_hit:
+                should_close = True
+                reason = "stop_loss"
+            elif breach:
+                should_close = True
+                reason = "short_strike_breach"
+            elif trend_break:
+                should_close = True
+                reason = "trend_break"
+            elif time_exit:
+                should_close = True
+                reason = "time_exit"
+            elif expiry_exit:
+                should_close = True
+                reason = "expiry"
+
+            if should_close:
+                exit_fees = fee_per_leg * 2.0
+                cash -= current_close_cost + exit_fees
+                realized = (
+                    position["entry_credit_dollars"]
+                    - current_close_cost
+                    - position["entry_fees_dollars"]
+                    - exit_fees
+                )
+                trades.append(
+                    {
+                        "underlying": "AAPL",
+                        "entry_date": position["entry_date"].isoformat(),
+                        "close_date": day.isoformat(),
+                        "entry_price": round(position["entry_credit_dollars"] / 100.0, 4),
+                        "close_price": round(current_close_cost / 100.0, 4),
+                        "qty": 1,
+                        "realized_pnl": round(realized, 4),
+                        "close_reason": reason,
+                    }
+                )
+                position = None
+
+        if position is None:
+            day_ivp = float(iv_percentile.get(day)) if day in iv_percentile.index else float("nan")
+            bullish_ok = (
+                pd.notna(ma20.loc[day])
+                and pd.notna(ma50.loc[day])
+                and pd.notna(ma200.loc[day])
+                and px > float(ma50.loc[day])
+                and float(ma20.loc[day]) > float(ma50.loc[day])
+                and px > float(ma200.loc[day])
+            )
+            support_floor = float("nan")
+            if pd.notna(ma50.loc[day]) and pd.notna(prior_20d_low.loc[day]):
+                support_floor = max(float(ma50.loc[day]), float(prior_20d_low.loc[day]))
+            iv_ok = pd.notna(day_ivp) and day_ivp >= 65.0
+
+            if bullish_ok and iv_ok and pd.notna(support_floor) and not day_slice.empty:
+                candidate = _select_bull_put_spread(
+                    day_slice,
+                    underlying="AAPL",
+                    support_floor=float(support_floor),
+                    target_dte=45,
+                    min_dte=38,
+                    max_dte=52,
+                    target_delta=-0.27,
+                    min_delta=-0.40,
+                    max_delta=-0.15,
+                    min_pop_pct=65.0,
+                    min_credit_dollars=45.0,
+                    max_risk_dollars=1000.0,
+                )
+                if candidate is not None:
+                    cash += candidate["entry_credit_dollars"] - candidate["entry_fees_dollars"]
+                    position = {**candidate, "entry_date": day}
+                    entry_credits.append(candidate["entry_credit_dollars"])
+                    entry_risks.append(candidate["max_risk_dollars"])
+                    entry_ivps.append(day_ivp)
+                    entry_pops.append(candidate["theoretical_pop_pct"])
+
+        if position is None:
+            equity = cash
+        else:
+            current_close_cost = _bull_put_spread_close_cost_dollars(position, day_slice, day)
+            equity = cash - current_close_cost
+
+        equity_curve.append(float(equity))
+        equity_points.append((day, float(equity)))
+
+    if position is not None and equity_points:
+        last_day = equity_points[-1][0]
+        day_slice = grouped.get(last_day, pd.DataFrame())
+        current_close_cost = _bull_put_spread_close_cost_dollars(position, day_slice, last_day)
+        exit_fees = fee_per_leg * 2.0
+        cash -= current_close_cost + exit_fees
+        realized = (
+            position["entry_credit_dollars"]
+            - current_close_cost
+            - position["entry_fees_dollars"]
+            - exit_fees
+        )
+        trades.append(
+            {
+                "underlying": "AAPL",
+                "entry_date": position["entry_date"].isoformat(),
+                "close_date": last_day.isoformat(),
+                "entry_price": round(position["entry_credit_dollars"] / 100.0, 4),
+                "close_price": round(current_close_cost / 100.0, 4),
+                "qty": 1,
+                "realized_pnl": round(realized, 4),
+                "close_reason": "period_end",
+            }
+        )
+        equity_curve[-1] = float(cash)
+        equity_points[-1] = (last_day, float(cash))
+
+    metrics = compute_metrics(trades, equity_curve)
+    metrics["rolls_executed"] = 0
+    metrics["trading_days"] = len(close.index)
+    metrics["avg_entry_credit"] = round(sum(entry_credits) / len(entry_credits), 4) if entry_credits else 0.0
+    metrics["avg_max_risk"] = round(sum(entry_risks) / len(entry_risks), 4) if entry_risks else 0.0
+    metrics["avg_entry_iv_percentile"] = round(sum(entry_ivps) / len(entry_ivps), 4) if entry_ivps else 0.0
+    metrics["avg_theoretical_pop_pct"] = round(sum(entry_pops) / len(entry_pops), 4) if entry_pops else 0.0
+
+    trade_pnls = _closed_trade_pnls(trades)
+    component_metrics = {
+        "structure": "bull_put_spread",
+        "entries": len(entry_credits),
+        "avg_entry_credit": round(sum(entry_credits) / len(entry_credits), 4) if entry_credits else 0.0,
+        "avg_max_risk": round(sum(entry_risks) / len(entry_risks), 4) if entry_risks else 0.0,
+        "avg_entry_iv_percentile": round(sum(entry_ivps) / len(entry_ivps), 4) if entry_ivps else 0.0,
+        "avg_theoretical_pop_pct": round(sum(entry_pops) / len(entry_pops), 4) if entry_pops else 0.0,
+        "entry_rule": "45DTE entry, 21DTE exit, high-IV seller, support-aware short strike",
+    }
+
+    return EngineOutput(
+        strategy_id="research_small_account_options",
+        strategy_name="Research Small Account Options",
+        variant="aapl_bull_put_45_21",
+        engine_type="research_small_account_options_engine",
+        assumptions_mode="aapl_bull_put_45_21",
+        universe="AAPL",
+        strategy_parameters={
+            "structure": "bull_put_spread",
+            "target_dte_range": [38, 52],
+            "exit_dte": 21,
+            "short_put_delta_range": [-0.40, -0.15],
+            "target_short_put_delta": -0.27,
+            "iv_percentile_min": 65.0,
+            "support_reference": "max(ma50, prior_20d_low)",
+            "max_risk_dollars": 1000.0,
+            "fee_per_leg": fee_per_leg,
+        },
+        metrics=metrics,
+        equity_curve=[float(v) for v in equity_curve],
+        equity_points=equity_points,
+        trade_pnls=trade_pnls,
+        component_metrics=component_metrics,
+    )
+
+
+def _run_research_aapl_long_call_low_iv(
+    data: pd.DataFrame,
+    start_date: date,
+    end_date: date,
+) -> EngineOutput:
+    frame = _prepare_option_research_frame(data, start_date, end_date, symbols=["AAPL"])
+    if frame.empty:
+        raise ValueError("No AAPL option-chain data available for research_small_account_options")
+
+    prices = _build_underlying_close_frame(data, start_date, end_date, symbols=["AAPL"])
+    if prices.empty or "AAPL" not in prices.columns:
+        raise ValueError("No AAPL price data available for research_small_account_options")
+
+    close = prices["AAPL"].astype(float).dropna()
+    ma20 = close.rolling(20).mean()
+    ma50 = close.rolling(50).mean()
+    ma200 = close.rolling(200).mean()
+    iv_percentile = _build_daily_iv_percentile(frame, "AAPL", min_dte=30, max_dte=60, lookback_days=252)
+    grouped = {d: g.copy() for d, g in frame.groupby("date")}
+
+    initial_capital = 100_000.0
+    cash = initial_capital
+    equity_curve: List[float] = [initial_capital]
+    equity_points: List[Tuple[date, float]] = []
+    trades: List[Dict[str, Any]] = []
+    position: Optional[Dict[str, Any]] = None
+    entry_debits: List[float] = []
+    entry_ivps: List[float] = []
+    entry_deltas: List[float] = []
+
+    fee_per_leg = 1.0
+    stop_loss_ratio = 0.55
+    force_close_dte = 21
+    min_hold_days = 3
+
+    for day in close.index:
+        px = float(close.loc[day])
+        day_slice = grouped.get(day, pd.DataFrame())
+
+        if position is not None:
+            current_value = _long_option_close_value_dollars(position, day_slice, day, leg_key="long_call")
+            dte_left = max((position["expiry_date"] - day).days, 0)
+            held_days = (day - position["entry_date"]).days
+            bearish_break = (
+                held_days >= min_hold_days
+                and pd.notna(ma50.loc[day])
+                and (
+                    px < float(ma50.loc[day])
+                    or (pd.notna(ma20.loc[day]) and float(ma20.loc[day]) < float(ma50.loc[day]))
+                )
+            )
+            stop_hit = current_value <= (position["entry_debit_dollars"] * stop_loss_ratio)
+            time_exit = dte_left <= force_close_dte
+            expiry_exit = dte_left <= 0
+
+            should_close = False
+            reason = "hold"
+            if stop_hit:
+                should_close = True
+                reason = "stop_loss"
+            elif bearish_break:
+                should_close = True
+                reason = "trend_break"
+            elif time_exit:
+                should_close = True
+                reason = "time_exit"
+            elif expiry_exit:
+                should_close = True
+                reason = "expiry"
+
+            if should_close:
+                exit_fees = fee_per_leg
+                cash += current_value - exit_fees
+                realized = (
+                    current_value
+                    - position["entry_debit_dollars"]
+                    - position["entry_fees_dollars"]
+                    - exit_fees
+                )
+                trades.append(
+                    {
+                        "underlying": "AAPL",
+                        "entry_date": position["entry_date"].isoformat(),
+                        "close_date": day.isoformat(),
+                        "entry_price": round(position["entry_debit_dollars"] / 100.0, 4),
+                        "close_price": round(current_value / 100.0, 4),
+                        "qty": 1,
+                        "realized_pnl": round(realized, 4),
+                        "close_reason": reason,
+                    }
+                )
+                position = None
+
+        if position is None:
+            day_ivp = float(iv_percentile.get(day)) if day in iv_percentile.index else float("nan")
+            bullish_ok = (
+                pd.notna(ma20.loc[day])
+                and pd.notna(ma50.loc[day])
+                and pd.notna(ma200.loc[day])
+                and px > float(ma20.loc[day])
+                and float(ma20.loc[day]) > float(ma50.loc[day])
+                and px > float(ma200.loc[day])
+            )
+            iv_ok = pd.notna(day_ivp) and day_ivp <= 35.0
+
+            if bullish_ok and iv_ok and not day_slice.empty:
+                candidate = _select_long_call(
+                    day_slice,
+                    underlying="AAPL",
+                    target_dte=45,
+                    min_dte=38,
+                    max_dte=52,
+                    target_delta=0.60,
+                    min_delta=0.45,
+                    max_delta=0.75,
+                    min_debit_dollars=100.0,
+                    max_debit_dollars=1000.0,
+                )
+                if candidate is not None:
+                    cash -= candidate["entry_debit_dollars"] + candidate["entry_fees_dollars"]
+                    position = {**candidate, "entry_date": day}
+                    entry_debits.append(candidate["entry_debit_dollars"])
+                    entry_ivps.append(day_ivp)
+                    entry_delta = candidate["long_call"].get("entry_delta")
+                    if entry_delta is not None:
+                        entry_deltas.append(float(entry_delta))
+
+        if position is None:
+            equity = cash
+        else:
+            current_value = _long_option_close_value_dollars(position, day_slice, day, leg_key="long_call")
+            equity = cash + current_value
+
+        equity_curve.append(float(equity))
+        equity_points.append((day, float(equity)))
+
+    if position is not None and equity_points:
+        last_day = equity_points[-1][0]
+        day_slice = grouped.get(last_day, pd.DataFrame())
+        current_value = _long_option_close_value_dollars(position, day_slice, last_day, leg_key="long_call")
+        exit_fees = fee_per_leg
+        cash += current_value - exit_fees
+        realized = (
+            current_value
+            - position["entry_debit_dollars"]
+            - position["entry_fees_dollars"]
+            - exit_fees
+        )
+        trades.append(
+            {
+                "underlying": "AAPL",
+                "entry_date": position["entry_date"].isoformat(),
+                "close_date": last_day.isoformat(),
+                "entry_price": round(position["entry_debit_dollars"] / 100.0, 4),
+                "close_price": round(current_value / 100.0, 4),
+                "qty": 1,
+                "realized_pnl": round(realized, 4),
+                "close_reason": "period_end",
+            }
+        )
+        equity_curve[-1] = float(cash)
+        equity_points[-1] = (last_day, float(cash))
+
+    metrics = compute_metrics(trades, equity_curve)
+    metrics["rolls_executed"] = 0
+    metrics["trading_days"] = len(close.index)
+    metrics["avg_entry_debit"] = round(sum(entry_debits) / len(entry_debits), 4) if entry_debits else 0.0
+    metrics["avg_entry_iv_percentile"] = round(sum(entry_ivps) / len(entry_ivps), 4) if entry_ivps else 0.0
+    metrics["avg_entry_delta"] = round(sum(entry_deltas) / len(entry_deltas), 4) if entry_deltas else 0.0
+
+    trade_pnls = _closed_trade_pnls(trades)
+    component_metrics = {
+        "structure": "long_call",
+        "entries": len(entry_debits),
+        "avg_entry_debit": round(sum(entry_debits) / len(entry_debits), 4) if entry_debits else 0.0,
+        "avg_entry_iv_percentile": round(sum(entry_ivps) / len(entry_ivps), 4) if entry_ivps else 0.0,
+        "avg_entry_delta": round(sum(entry_deltas) / len(entry_deltas), 4) if entry_deltas else 0.0,
+        "entry_rule": "45DTE entry, 21DTE exit, low-IV buyer",
+    }
+
+    return EngineOutput(
+        strategy_id="research_small_account_options",
+        strategy_name="Research Small Account Options",
+        variant="aapl_long_call_low_iv",
+        engine_type="research_small_account_options_engine",
+        assumptions_mode="aapl_long_call_low_iv",
+        universe="AAPL",
+        strategy_parameters={
+            "structure": "long_call",
+            "target_dte_range": [38, 52],
+            "exit_dte": 21,
+            "target_delta": 0.60,
+            "delta_range": [0.45, 0.75],
+            "iv_percentile_max": 35.0,
+            "max_debit_dollars": 1000.0,
+            "fee_per_leg": fee_per_leg,
+        },
+        metrics=metrics,
+        equity_curve=[float(v) for v in equity_curve],
+        equity_points=equity_points,
+        trade_pnls=trade_pnls,
+        component_metrics=component_metrics,
+    )
+
+
+def _prepare_option_research_frame(
+    data: pd.DataFrame,
+    start_date: date,
+    end_date: date,
+    symbols: List[str],
+) -> pd.DataFrame:
+    required = {
+        "date",
+        "underlying",
+        "contract_symbol",
+        "option_type",
+        "strike",
+        "expiration_date",
+        "dte",
+        "bid",
+        "ask",
+        "delta",
+        "underlying_price",
+    }
+    if not required.issubset(set(data.columns)):
+        return pd.DataFrame()
+
+    frame = data.copy()
+    frame["date"] = pd.to_datetime(frame["date"]).dt.date
+    frame["expiration_date"] = pd.to_datetime(frame["expiration_date"]).dt.date
+    frame = frame[(frame["date"] >= start_date) & (frame["date"] <= end_date)]
+    frame = frame[frame["underlying"].isin(symbols)].copy()
+    if frame.empty:
+        return pd.DataFrame()
+
+    numeric_cols = [
+        "strike",
+        "dte",
+        "bid",
+        "ask",
+        "delta",
+        "underlying_price",
+        "implied_volatility",
+        "spread_pct",
+    ]
+    for col in numeric_cols:
+        if col in frame.columns:
+            frame[col] = pd.to_numeric(frame[col], errors="coerce")
+    frame = frame.dropna(
+        subset=[
+            "date",
+            "underlying",
+            "contract_symbol",
+            "option_type",
+            "strike",
+            "expiration_date",
+            "dte",
+            "bid",
+            "ask",
+            "delta",
+            "underlying_price",
+        ]
+    )
+    frame = frame[(frame["ask"] > 0.0) & (frame["bid"] >= 0.0)]
+    return frame.sort_values(
+        ["date", "underlying", "expiration_date", "option_type", "strike"]
+    )
+
+
+def _pick_closest_delta_contract(
+    chain: pd.DataFrame,
+    target_delta: float,
+    min_delta: float,
+    max_delta: float,
+) -> Optional[pd.Series]:
+    if chain.empty:
+        return None
+    subset = chain[(chain["delta"] >= min_delta) & (chain["delta"] <= max_delta)].copy()
+    if subset.empty:
+        return None
+    if "spread_pct" in subset.columns:
+        subset["_spread_rank"] = subset["spread_pct"].fillna(999.0)
+    else:
+        subset["_spread_rank"] = 999.0
+    subset["_delta_gap"] = (subset["delta"] - target_delta).abs()
+    subset = subset.sort_values(["_delta_gap", "_spread_rank", "ask", "strike"])
+    return subset.iloc[0]
+
+
+def _build_option_leg(row: pd.Series) -> Dict[str, Any]:
+    bid = float(row["bid"])
+    ask = float(row["ask"])
+    mid = (bid + ask) / 2.0
+    spot = float(row["underlying_price"])
+    strike = float(row["strike"])
+    option_type = str(row["option_type"]).lower()
+    if option_type == "put":
+        intrinsic = max(strike - spot, 0.0)
+    else:
+        intrinsic = max(spot - strike, 0.0)
+    time_value0 = max(mid - intrinsic, 0.0)
+    return {
+        "contract_symbol": str(row["contract_symbol"]),
+        "underlying": str(row["underlying"]),
+        "option_type": option_type,
+        "strike": strike,
+        "expiration_date": row["expiration_date"],
+        "dte_days": int(float(row["dte"])),
+        "entry_underlying": spot,
+        "time_value0": time_value0,
+        "entry_delta": float(row["delta"]) if pd.notna(row.get("delta")) else None,
+    }
+
+
+def _lookup_leg_close_price(
+    day_slice: pd.DataFrame,
+    leg: Dict[str, Any],
+    day: date,
+    side: str,
+) -> float:
+    if not day_slice.empty:
+        match = day_slice[day_slice["contract_symbol"] == leg["contract_symbol"]]
+        if match.empty:
+            match = day_slice[
+                (day_slice["underlying"] == leg["underlying"])
+                & (day_slice["option_type"].astype(str).str.lower() == leg["option_type"])
+                & (day_slice["expiration_date"] == leg["expiration_date"])
+                & (day_slice["strike"] == leg["strike"])
+            ]
+        if not match.empty:
+            row = match.iloc[0]
+            if side == "sell":
+                return max(float(row["bid"]), 0.01)
+            return max(float(row["ask"]), 0.01)
+
+    px = float(leg.get("entry_underlying", 0.0))
+    if not day_slice.empty and "underlying_price" in day_slice.columns:
+        try:
+            px = float(day_slice["underlying_price"].iloc[0])
+        except (TypeError, ValueError, IndexError):
+            px = float(leg.get("entry_underlying", 0.0))
+    dte_left = max((leg["expiration_date"] - day).days, 0)
+    if leg["option_type"] == "put":
+        mid = _option_mark_put(
+            px=px,
+            strike=float(leg["strike"]),
+            time_value_at_entry=float(leg["time_value0"]),
+            dte_left=dte_left,
+            dte_total=int(leg["dte_days"]),
+        )
+    else:
+        mid = _option_mark_call(
+            px=px,
+            strike=float(leg["strike"]),
+            time_value_at_entry=float(leg["time_value0"]),
+            dte_left=dte_left,
+            dte_total=int(leg["dte_days"]),
+        )
+    spread = max(mid * 0.02, 0.01)
+    if side == "sell":
+        return max(mid - spread, 0.01)
+    return max(mid + spread, 0.01)
+
+
+def _condor_close_cost_dollars(
+    position: Dict[str, Any],
+    day_slice: pd.DataFrame,
+    day: date,
+) -> float:
+    short_put_ask = _lookup_leg_close_price(day_slice, position["short_put"], day, side="buy")
+    long_put_bid = _lookup_leg_close_price(day_slice, position["long_put"], day, side="sell")
+    short_call_ask = _lookup_leg_close_price(day_slice, position["short_call"], day, side="buy")
+    long_call_bid = _lookup_leg_close_price(day_slice, position["long_call"], day, side="sell")
+    put_spread = max(short_put_ask - long_put_bid, 0.0)
+    call_spread = max(short_call_ask - long_call_bid, 0.0)
+    return round((put_spread + call_spread) * 100.0, 4)
+
+
+def _bull_call_spread_close_value_dollars(
+    position: Dict[str, Any],
+    day_slice: pd.DataFrame,
+    day: date,
+) -> float:
+    long_bid = _lookup_leg_close_price(day_slice, position["long_call"], day, side="sell")
+    short_ask = _lookup_leg_close_price(day_slice, position["short_call"], day, side="buy")
+    return round(max(long_bid - short_ask, 0.0) * 100.0, 4)
+
+
+def _bull_put_spread_close_cost_dollars(
+    position: Dict[str, Any],
+    day_slice: pd.DataFrame,
+    day: date,
+) -> float:
+    short_put_ask = _lookup_leg_close_price(day_slice, position["short_put"], day, side="buy")
+    long_put_bid = _lookup_leg_close_price(day_slice, position["long_put"], day, side="sell")
+    return round(max(short_put_ask - long_put_bid, 0.0) * 100.0, 4)
+
+
+def _long_option_close_value_dollars(
+    position: Dict[str, Any],
+    day_slice: pd.DataFrame,
+    day: date,
+    leg_key: str,
+) -> float:
+    value = _lookup_leg_close_price(day_slice, position[leg_key], day, side="sell")
+    return round(max(value, 0.0) * 100.0, 4)
+
+
+def _compute_iv_percentile_series(
+    series: pd.Series,
+    lookback_days: int = 252,
+    min_history: int = 60,
+) -> pd.Series:
+    if series.empty:
+        return pd.Series(dtype=float)
+
+    clean = series.astype(float).copy()
+    idx = list(clean.index)
+    vals = clean.tolist()
+    out: List[float] = []
+
+    for i, current in enumerate(vals):
+        if pd.isna(current):
+            out.append(float("nan"))
+            continue
+        start = max(0, i - lookback_days)
+        history = [v for v in vals[start:i] if pd.notna(v)]
+        if len(history) < min_history:
+            out.append(float("nan"))
+            continue
+        lower = sum(1 for v in history if v < current)
+        equal = sum(1 for v in history if v == current)
+        percentile = ((lower + (0.5 * equal)) / len(history)) * 100.0
+        out.append(float(percentile))
+
+    return pd.Series(out, index=idx, dtype=float)
+
+
+def _build_daily_iv_percentile(
+    frame: pd.DataFrame,
+    underlying: str,
+    min_dte: int = 30,
+    max_dte: int = 60,
+    lookback_days: int = 252,
+) -> pd.Series:
+    if frame.empty or "implied_volatility" not in frame.columns:
+        return pd.Series(dtype=float)
+
+    subset = frame[
+        (frame["underlying"] == underlying)
+        & (frame["dte"] >= min_dte)
+        & (frame["dte"] <= max_dte)
+        & frame["implied_volatility"].notna()
+        & (frame["implied_volatility"] > 0.0)
+    ].copy()
+    if subset.empty:
+        return pd.Series(dtype=float)
+
+    subset["_atm_gap"] = (subset["strike"] / subset["underlying_price"] - 1.0).abs()
+    subset = subset.sort_values(["date", "_atm_gap", "dte"])
+    subset["_atm_rank"] = subset.groupby("date")["_atm_gap"].rank(method="first")
+    daily_iv = (
+        subset[subset["_atm_rank"] <= 8]
+        .groupby("date")["implied_volatility"]
+        .median()
+        .sort_index()
+    )
+    return _compute_iv_percentile_series(daily_iv, lookback_days=lookback_days)
+
+
+def _select_spy_iron_condor_proxy(day_slice: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    chain = day_slice[(day_slice["underlying"] == "SPY") & (day_slice["dte"] >= 30) & (day_slice["dte"] <= 60)]
+    if chain.empty:
+        return None
+
+    expiries = sorted(
+        chain["expiration_date"].dropna().unique().tolist(),
+        key=lambda exp: abs(
+            float(chain[chain["expiration_date"] == exp]["dte"].median()) - 45.0
+        ),
+    )
+    best_candidate: Optional[Dict[str, Any]] = None
+    best_score = float("-inf")
+
+    for exp in expiries:
+        exp_rows = chain[chain["expiration_date"] == exp]
+        puts = exp_rows[exp_rows["option_type"].astype(str).str.lower() == "put"]
+        calls = exp_rows[exp_rows["option_type"].astype(str).str.lower() == "call"]
+        short_put = _pick_closest_delta_contract(puts, -0.12, -0.25, -0.08)
+        short_call = _pick_closest_delta_contract(calls, 0.12, 0.08, 0.25)
+        if short_put is None or short_call is None:
+            continue
+
+        long_puts = puts[puts["strike"] < float(short_put["strike"])].sort_values(
+            "strike", ascending=False
+        )
+        long_calls = calls[calls["strike"] > float(short_call["strike"])].sort_values(
+            "strike"
+        )
+        if long_puts.empty or long_calls.empty:
+            continue
+
+        for _, long_put in long_puts.head(3).iterrows():
+            for _, long_call in long_calls.head(3).iterrows():
+                put_width_dollars = (float(short_put["strike"]) - float(long_put["strike"])) * 100.0
+                call_width_dollars = (float(long_call["strike"]) - float(short_call["strike"])) * 100.0
+                entry_credit_dollars = (
+                    (float(short_put["bid"]) - float(long_put["ask"]))
+                    + (float(short_call["bid"]) - float(long_call["ask"]))
+                ) * 100.0
+                max_risk_dollars = max(put_width_dollars, call_width_dollars) - entry_credit_dollars
+                if (
+                    entry_credit_dollars <= 0.0
+                    or max_risk_dollars < 100.0
+                    or max_risk_dollars > 1000.0
+                ):
+                    continue
+                score = (
+                    (entry_credit_dollars / max(max_risk_dollars, 1.0))
+                    - (abs(put_width_dollars - call_width_dollars) / 1000.0)
+                )
+                if score <= best_score:
+                    continue
+                best_score = score
+                best_candidate = {
+                    "expiry_date": exp,
+                    "short_put": _build_option_leg(short_put),
+                    "long_put": _build_option_leg(long_put),
+                    "short_call": _build_option_leg(short_call),
+                    "long_call": _build_option_leg(long_call),
+                    "entry_credit_dollars": round(entry_credit_dollars, 4),
+                    "max_risk_dollars": round(max_risk_dollars, 4),
+                    "entry_fees_dollars": 4.0,
+                }
+
+    return best_candidate
+
+
+def _select_msft_bull_call_spread(day_slice: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    chain = day_slice[
+        (day_slice["underlying"] == "MSFT")
+        & (day_slice["option_type"].astype(str).str.lower() == "call")
+        & (day_slice["dte"] >= 30)
+        & (day_slice["dte"] <= 60)
+    ]
+    if chain.empty:
+        return None
+
+    expiries = sorted(
+        chain["expiration_date"].dropna().unique().tolist(),
+        key=lambda exp: abs(
+            float(chain[chain["expiration_date"] == exp]["dte"].median()) - 45.0
+        ),
+    )
+    best_candidate: Optional[Dict[str, Any]] = None
+    best_score = float("-inf")
+
+    for exp in expiries:
+        exp_rows = chain[chain["expiration_date"] == exp]
+        longs = exp_rows[(exp_rows["delta"] >= 0.50) & (exp_rows["delta"] <= 0.75)].copy()
+        if longs.empty:
+            continue
+        longs["_delta_gap"] = (longs["delta"] - 0.60).abs()
+        longs = longs.sort_values(["_delta_gap", "ask", "strike"])
+
+        for _, long_call in longs.head(5).iterrows():
+            shorts = exp_rows[
+                (exp_rows["strike"] > float(long_call["strike"]))
+                & (exp_rows["delta"] >= 0.20)
+                & (exp_rows["delta"] <= 0.45)
+            ].copy()
+            if shorts.empty:
+                continue
+            shorts["_delta_gap"] = (shorts["delta"] - 0.30).abs()
+            shorts = shorts.sort_values(["_delta_gap", "strike", "ask"])
+            for _, short_call in shorts.head(6).iterrows():
+                width_dollars = (float(short_call["strike"]) - float(long_call["strike"])) * 100.0
+                entry_debit_dollars = (
+                    float(long_call["ask"]) - float(short_call["bid"])
+                ) * 100.0
+                max_gain_dollars = width_dollars - entry_debit_dollars
+                if (
+                    width_dollars < 500.0
+                    or entry_debit_dollars < 100.0
+                    or entry_debit_dollars > 1000.0
+                    or max_gain_dollars <= 0.0
+                ):
+                    continue
+                score = (
+                    (max_gain_dollars / max(entry_debit_dollars, 1.0))
+                    - (abs(float(short_call["delta"]) - 0.30) * 0.25)
+                )
+                if score <= best_score:
+                    continue
+                best_score = score
+                best_candidate = {
+                    "expiry_date": exp,
+                    "long_call": _build_option_leg(long_call),
+                    "short_call": _build_option_leg(short_call),
+                    "entry_debit_dollars": round(entry_debit_dollars, 4),
+                    "max_gain_dollars": round(max_gain_dollars, 4),
+                    "entry_fees_dollars": 2.0,
+                }
+
+    return best_candidate
+
+
+def _select_bull_put_spread(
+    day_slice: pd.DataFrame,
+    underlying: str,
+    support_floor: float,
+    target_dte: int = 45,
+    min_dte: int = 38,
+    max_dte: int = 52,
+    target_delta: float = -0.27,
+    min_delta: float = -0.40,
+    max_delta: float = -0.15,
+    min_pop_pct: float = 65.0,
+    min_credit_dollars: float = 40.0,
+    max_risk_dollars: float = 1000.0,
+) -> Optional[Dict[str, Any]]:
+    chain = day_slice[
+        (day_slice["underlying"] == underlying)
+        & (day_slice["option_type"].astype(str).str.lower() == "put")
+        & (day_slice["dte"] >= min_dte)
+        & (day_slice["dte"] <= max_dte)
+    ]
+    if chain.empty:
+        return None
+
+    expiries = sorted(
+        chain["expiration_date"].dropna().unique().tolist(),
+        key=lambda exp: abs(
+            float(chain[chain["expiration_date"] == exp]["dte"].median()) - float(target_dte)
+        ),
+    )
+    best_candidate: Optional[Dict[str, Any]] = None
+    best_score = float("-inf")
+
+    for exp in expiries:
+        exp_rows = chain[chain["expiration_date"] == exp].copy()
+        if exp_rows.empty:
+            continue
+        shorts = exp_rows[
+            (exp_rows["delta"] >= min_delta)
+            & (exp_rows["delta"] <= max_delta)
+            & (exp_rows["strike"] <= support_floor)
+        ].copy()
+        if shorts.empty:
+            continue
+        shorts["_delta_gap"] = (shorts["delta"] - target_delta).abs()
+        shorts = shorts.sort_values(["_delta_gap", "spread_pct", "strike"], ascending=[True, True, False])
+
+        for _, short_put in shorts.head(8).iterrows():
+            longs = exp_rows[exp_rows["strike"] < float(short_put["strike"])].copy()
+            if longs.empty:
+                continue
+            longs["_width_dollars"] = (
+                (float(short_put["strike"]) - longs["strike"]) * 100.0
+            )
+            longs = longs[(longs["_width_dollars"] >= 100.0) & (longs["_width_dollars"] <= 1000.0)]
+            if longs.empty:
+                continue
+            longs = longs.sort_values(["_width_dollars", "ask", "strike"])
+
+            for _, long_put in longs.head(8).iterrows():
+                width_dollars = (float(short_put["strike"]) - float(long_put["strike"])) * 100.0
+                entry_credit_dollars = (
+                    float(short_put["bid"]) - float(long_put["ask"])
+                ) * 100.0
+                max_loss_dollars = width_dollars - entry_credit_dollars
+                break_even = float(short_put["strike"]) - (entry_credit_dollars / 100.0)
+                theoretical_pop_pct = max(0.0, min(1.0, 1.0 - abs(float(short_put["delta"])))) * 100.0
+
+                if (
+                    entry_credit_dollars < min_credit_dollars
+                    or max_loss_dollars <= 0.0
+                    or max_loss_dollars > max_risk_dollars
+                    or break_even > support_floor
+                    or theoretical_pop_pct < min_pop_pct
+                ):
+                    continue
+
+                support_buffer_pct = (
+                    (support_floor - break_even) / max(float(short_put["underlying_price"]), 1.0)
+                )
+                score = (
+                    (entry_credit_dollars / max(max_loss_dollars, 1.0))
+                    + (theoretical_pop_pct / 100.0)
+                    + support_buffer_pct
+                    - max(float(short_put.get("spread_pct", 0.0) or 0.0), 0.0)
+                )
+                if score <= best_score:
+                    continue
+                best_score = score
+                best_candidate = {
+                    "expiry_date": exp,
+                    "short_put": _build_option_leg(short_put),
+                    "long_put": _build_option_leg(long_put),
+                    "entry_credit_dollars": round(entry_credit_dollars, 4),
+                    "max_risk_dollars": round(max_loss_dollars, 4),
+                    "break_even": round(break_even, 4),
+                    "support_floor": round(float(support_floor), 4),
+                    "theoretical_pop_pct": round(theoretical_pop_pct, 4),
+                    "entry_fees_dollars": 2.0,
+                }
+
+    return best_candidate
+
+
+def _select_long_call(
+    day_slice: pd.DataFrame,
+    underlying: str,
+    target_dte: int = 45,
+    min_dte: int = 38,
+    max_dte: int = 52,
+    target_delta: float = 0.60,
+    min_delta: float = 0.45,
+    max_delta: float = 0.75,
+    min_debit_dollars: float = 100.0,
+    max_debit_dollars: float = 1000.0,
+) -> Optional[Dict[str, Any]]:
+    chain = day_slice[
+        (day_slice["underlying"] == underlying)
+        & (day_slice["option_type"].astype(str).str.lower() == "call")
+        & (day_slice["dte"] >= min_dte)
+        & (day_slice["dte"] <= max_dte)
+    ]
+    if chain.empty:
+        return None
+
+    expiries = sorted(
+        chain["expiration_date"].dropna().unique().tolist(),
+        key=lambda exp: abs(
+            float(chain[chain["expiration_date"] == exp]["dte"].median()) - float(target_dte)
+        ),
+    )
+    best_candidate: Optional[Dict[str, Any]] = None
+    best_score = float("-inf")
+
+    for exp in expiries:
+        exp_rows = chain[chain["expiration_date"] == exp].copy()
+        call_row = _pick_closest_delta_contract(exp_rows, target_delta, min_delta, max_delta)
+        if call_row is None:
+            continue
+        entry_debit_dollars = float(call_row["ask"]) * 100.0
+        if entry_debit_dollars < min_debit_dollars or entry_debit_dollars > max_debit_dollars:
+            continue
+
+        spread_penalty = max(float(call_row.get("spread_pct", 0.0) or 0.0), 0.0)
+        delta_gap = abs(float(call_row["delta"]) - target_delta)
+        score = 1.0 - delta_gap - spread_penalty - (entry_debit_dollars / max(max_debit_dollars, 1.0))
+        if score <= best_score:
+            continue
+        best_score = score
+        best_candidate = {
+            "expiry_date": exp,
+            "long_call": _build_option_leg(call_row),
+            "entry_debit_dollars": round(entry_debit_dollars, 4),
+            "entry_fees_dollars": 1.0,
+        }
+
+    return best_candidate
 
 
 def _run_research_buywrite_spy(
@@ -1896,6 +3937,14 @@ def _build_underlying_close_frame(
         if sym not in daily.columns:
             daily[sym] = pd.NA
     return daily[symbols].dropna(how="all")
+
+
+def _wilder_rsi_frame(prices: pd.DataFrame, period: int = 14) -> pd.DataFrame:
+    delta = prices.diff()
+    gains = delta.clip(lower=0).ewm(alpha=1.0 / max(period, 1), adjust=False).mean()
+    losses = (-delta.clip(upper=0)).ewm(alpha=1.0 / max(period, 1), adjust=False).mean()
+    rs = gains / (losses + 1e-9)
+    return 100.0 - (100.0 / (1.0 + rs))
 
 
 def _trading_days(data: pd.DataFrame, start_date: date, end_date: date) -> List[date]:

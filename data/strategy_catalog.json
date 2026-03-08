@@ -35,6 +35,32 @@
   {
     "strategy_id": "openclaw_put_credit_spread",
     "strategy_name": "OpenClaw Put Credit Spread",
+    "variant": "qqq_falling_knife",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "QQQ only - daily-rule proxy for a high-probability income spread entered after sharp downside moves in elevated volatility.",
+    "description": "QQQ-only put credit spread profile inspired by a tastylive-style falling-knife income trade. Uses long-term trend support plus short-term selloff, RSI, and pullback filters to define when a high-POP bullish spread is allowed.",
+    "hypothesis": "A far-OTM QQQ put credit spread sold only after sharp, high-volatility pullbacks can monetize panic premium while keeping buying-power use small and defined risk.",
+    "entry_rules": [
+      "QQQ only",
+      "Price above MA200; MA20 above MA50 is not required",
+      "RSI(14) <= 45",
+      "1-day return <= -1.0% OR 3-day return <= -2.0%",
+      "At least 2.0% below prior 20-day high",
+      "HV20 between 18% and 80%",
+      "Short put 6.0% OTM, width 4.0% of price",
+      "Credit target about 18% of spread width"
+    ],
+    "management_rules": [
+      "Take profit at 50% of credit after at least 2 days",
+      "Stop at 1.9x credit or 55% of width",
+      "Force close at 7 DTE",
+      "Close if long strike is breached"
+    ]
+  },
+  {
+    "strategy_id": "openclaw_put_credit_spread",
+    "strategy_name": "OpenClaw Put Credit Spread",
     "variant": "pcs_trend_baseline",
     "status": "experimental",
     "champion": false,
@@ -81,6 +107,16 @@
     "universe_note": "Uses selected universe profile (default top_50) with looser spread and opportunity filters",
     "description": "Aggressive intraday profile with larger target and wider stop to pursue larger single-session option gains.",
     "hypothesis": "Higher reward-to-risk profile can outperform in strong directional sessions, with lower win-rate tolerance."
+  },
+  {
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "conservative_v2",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Uses selected universe profile (default top_50) with moderately tighter flow and liquidity gates",
+    "description": "Middle-ground intraday variant between baseline and oos_hardened. Raises liquidity score threshold (0.35 -> 0.42) and unusual-flow gate (1.05x -> 1.10x) while keeping 3 trades/day and 2% allocation to target better OOS stability without sacrificing trade count.",
+    "hypothesis": "The baseline's 2024-2025 OOS collapse (from 6496% IS to near-zero) is driven by weak-quality setups that pass a 0.35 liquidity score but fail live. Tightening just 2 filters should recover OOS Sharpe while keeping enough trades to be statistically meaningful."
   },
   {
     "strategy_id": "intraday_open_close_options",
@@ -220,6 +256,16 @@
   },
   {
     "strategy_id": "stock_replacement",
+    "strategy_name": "Full Filter IV Rank Trend Liquid",
+    "variant": "full_filter_iv_rank_trend_liquid",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Requires top_50 universe. Keeps the full_filter_iv_rank gate stack, then adds symbol-trend and tighter option-quality constraints to target lower OOS drawdown.",
+    "description": "full_filter_iv_rank tightened with higher target delta, lower extrinsic cap, tighter spread limits, shorter 21-45 DTE window, and bearish-cross exits.",
+    "hypothesis": "Pairing the existing IV-rank entry edge with stricter liquidity/theta filters and trend exits should improve walk-forward drawdown and Sharpe, even if raw return falls."
+  },
+  {
+    "strategy_id": "stock_replacement",
     "strategy_name": "Stock Replacement",
     "variant": "full_filter_rs",
     "status": "archived",
@@ -237,6 +283,16 @@
     "universe_note": "Requires top_50 universe. Best risk-adjusted variant: +320.5% return (near baseline) with 15.6pp lower max drawdown (40.8% vs 56.4%).",
     "description": "full_filter_20pos + both IV rank (< 40th percentile, 252d lookback) AND relative strength (stock >= SPY over 90d) gates combined. Best risk-adjusted result: +320.5% (near baseline), Sharpe 0.68, Max DD 40.8% (vs 56.4% baseline). Nearly same return with 15.6pp lower drawdown.",
     "hypothesis": "Combining cheap option premium with relative outperformance captures the best risk/reward setups: strong stock + inexpensive calls."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Full Filter IV RS Trend Liquid",
+    "variant": "full_filter_iv_rs_trend_liquid",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Requires top_50 universe. Keeps the IV-rank + relative-strength stack, then adds symbol-trend and tighter option-quality constraints to target lower OOS drawdown.",
+    "description": "full_filter_iv_rs tightened with higher target delta, lower extrinsic cap, tighter spread limits, shorter 21-45 DTE window, and bearish-cross exits.",
+    "hypothesis": "Combining cheap premium, relative outperformance, cleaner execution filters, and trend exits should improve OOS stability versus the existing full_filter_iv_rs baseline."
   },
   {
     "strategy_id": "stock_replacement",
@@ -856,6 +912,324 @@
       "Take profit at 45% of credit received",
       "Stop at 2.0x credit received",
       "Close at 12 DTE (earlier time exit than baseline)"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Swing RSI Bounce",
+    "variant": "swing_rsi_bounce",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Requires weekly expirations in cache — run: python main.py generate. Works best with the default top_50 tech-heavy universe.",
+    "description": "1-3 day directional long calls entered on RSI(14) < 35 oversold bounce. Target delta 0.60, DTE 7-21 days. Exit on 35% profit target, 20% stop loss, or 3-day max hold.",
+    "hypothesis": "RSI oversold readings on quality tech stocks signal short-term mean-reversion snap-backs that weekly calls at 0.60 delta can capture before time decay erodes value.",
+    "entry_rules": [
+      "RSI(14) < 35 (oversold territory)",
+      "Target delta 0.60 (+/- 0.10)",
+      "DTE 7-21 days (weekly expirations)",
+      "Max extrinsic 60% of ask",
+      "Max 5 concurrent positions"
+    ],
+    "management_rules": [
+      "Take profit at +35% option value gain",
+      "Stop loss at -20% option value loss",
+      "Close after 3 calendar days regardless of P&L"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Swing Momentum Breakout",
+    "variant": "swing_momentum_breakout",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Requires weekly expirations in cache — run: python main.py generate. Works best with the default top_50 tech-heavy universe.",
+    "description": "1-3 day directional long calls entered when price breaks above the prior 5-day high (consolidation breakout). Target delta 0.65, DTE 7-21 days. Exit on 40% profit target, 22% stop, or 3-day hold.",
+    "hypothesis": "Price breaking above recent consolidation on quality growth stocks signals continuation momentum. Weekly calls at 0.65 delta provide enough leverage to capture the initial breakout move in 1-3 days.",
+    "entry_rules": [
+      "Price > prior 5-day rolling high (breakout signal)",
+      "Target delta 0.65 (+/- 0.10)",
+      "DTE 7-21 days (weekly expirations)",
+      "Max extrinsic 55% of ask",
+      "Max 5 concurrent positions"
+    ],
+    "management_rules": [
+      "Take profit at +40% option value gain",
+      "Stop loss at -22% option value loss",
+      "Close after 3 calendar days regardless of P&L"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Swing Aggressive",
+    "variant": "swing_aggressive",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Requires weekly expirations in cache — run: python main.py generate. Fewest signals — both RSI AND breakout required simultaneously.",
+    "description": "High-conviction 1-2 day directional calls requiring BOTH RSI(14) < 40 AND a 5-day price breakout. Target delta 0.70, DTE 7-14 days. Exit on 50% profit, 25% stop, or 2-day hold.",
+    "hypothesis": "Combining mean-reversion oversold signal with momentum breakout confirmation produces fewer but higher-conviction entries. Short DTE (7-14 days) maximises gamma exposure for quick large moves.",
+    "entry_rules": [
+      "RSI(14) < 40 AND price > prior 5-day high (both required)",
+      "Target delta 0.70 (+/- 0.10)",
+      "DTE 7-14 days (very short, maximum gamma)",
+      "Max extrinsic 50% of ask",
+      "Max 3 concurrent positions (concentrated, high-conviction)"
+    ],
+    "management_rules": [
+      "Take profit at +50% option value gain",
+      "Stop loss at -25% option value loss",
+      "Close after 2 calendar days regardless of P&L"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Swing Conservative",
+    "variant": "swing_conservative",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Requires weekly expirations in cache — run: python main.py generate. Lower delta (0.55) means cheaper premium and lower capital at risk per trade.",
+    "description": "Capital-preserving 1-3 day long calls on RSI(14) < 35 oversold. Target delta 0.55 (slightly OTM for lower cost), DTE 10-21 days. Tight 15% stop loss to protect capital.",
+    "hypothesis": "Lower delta options cost less premium, so losses are smaller in absolute dollar terms. RSI-only signal on oversold quality stocks with a tight stop preserves capital while still capturing oversold bounces.",
+    "entry_rules": [
+      "RSI(14) < 35 (oversold territory)",
+      "Target delta 0.55 (+/- 0.10) — slightly OTM for lower premium cost",
+      "DTE 10-21 days",
+      "Max extrinsic 65% of ask",
+      "Max 8 concurrent positions"
+    ],
+    "management_rules": [
+      "Take profit at +30% option value gain",
+      "Stop loss at -15% option value loss (tight — capital preservation focus)",
+      "Close after 3 calendar days regardless of P&L"
+    ]
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "regime_balanced",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - switches spread direction by broad-trend regime rather than running bullish and bearish engines independently.",
+    "description": "Regime-switch credit spread engine: legacy PCS profile in bullish regimes, CCS baseline profile in bearish or neutral regimes. Designed to reduce single-regime concentration while keeping the higher-quality spread templates already validated elsewhere in the repo.",
+    "hypothesis": "Switching between put and call credit spreads by trend regime can preserve premium collection through more market states than a single-side spread engine."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "regime_defensive",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - uses the stricter PCS VIX gate on bullish legs and the defensive CCS template on bearish or neutral legs.",
+    "description": "Defensive regime-switch blend: PCS VIX-optimal on bullish regimes plus CCS defensive on bearish or neutral regimes, with a tighter overextension guard for short-call entries.",
+    "hypothesis": "Combining stricter bullish PCS filters with a lower-delta bearish call-spread profile should improve drawdown behavior while retaining multi-regime premium capture."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "regime_legacy_defensive",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - keeps the highest-return bullish PCS leg and swaps in the more defensive CCS template on bearish and neutral regimes.",
+    "description": "Hybrid regime-switch spread engine: legacy PCS in bullish regimes, defensive CCS in bearish and neutral regimes, with a tighter overextension guard for short-call entries.",
+    "hypothesis": "Keeping the strongest bullish PCS edge while using the lower-delta CCS template on the call side may retain upside compounding and improve regime-switch robustness."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "regime_vix_baseline",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - uses the stricter bullish PCS VIX gate while keeping the higher-return CCS baseline for bearish and neutral regimes.",
+    "description": "Volatility-aware regime-switch spread engine: PCS VIX-optimal in bullish regimes, CCS baseline in bearish and neutral regimes.",
+    "hypothesis": "Filtering bullish PCS entries by volatility while preserving the higher-return baseline call-credit template may improve regime timing without sacrificing too much premium capture."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "regime_legacy_defensive_bear_only",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - legacy PCS in bullish regimes, defensive CCS in bearish regimes, and no call entries in neutral regimes.",
+    "description": "Bear-only regime-switch hybrid: legacy PCS when trend is bullish, defensive CCS only in outright bearish regimes, and neutral periods held in cash.",
+    "hypothesis": "Neutral regimes may be lower-conviction for short calls; sitting them out can reduce churn and keep regime-switching focused on clearer directional states."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "regime_vix_baseline_bear_only",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - PCS VIX-optimal in bullish regimes, CCS baseline in bearish regimes, and no call entries in neutral regimes.",
+    "description": "Bear-only volatility-aware regime switch: PCS VIX-optimal on bullish legs, CCS baseline only in outright bearish regimes, and neutral periods held in cash.",
+    "hypothesis": "Using the stricter bullish PCS filter and skipping neutral call-selling may improve OOS discipline by concentrating trades in the most directional regimes."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Gap Momentum Call",
+    "variant": "gap_momentum_call",
+    "status": "experimental",
+    "champion": false,
+    "description": "Buy slightly ITM calls (delta ~0.55) on gap-up days when the stock closes >1.5% above the prior close. DTE 21-45 days. Target 80% premium gain within 5 days. Based on the gap-and-go momentum entry from the YouTube video strategy.",
+    "hypothesis": "Stocks that close 1.5%+ above the prior close show institutional buying momentum likely to continue 1-5 days. ITM calls at ~0.55 delta give >50% probability of expiring in the money while controlling risk to the premium paid."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Gap Momentum Put",
+    "variant": "gap_momentum_put",
+    "status": "experimental",
+    "champion": false,
+    "description": "Buy slightly ITM puts (delta ~-0.55) on gap-down days when the stock closes >1.5% below the prior close. DTE 21-45 days. Target 80% premium gain within 5 days. The bearish mirror of the Gap Momentum Call strategy.",
+    "hypothesis": "Stocks that close 1.5%+ below the prior close show institutional selling likely to continue 1-5 days. ITM puts at ~0.55 delta capture the leveraged downside with defined risk limited to premium paid."
+  },
+  {
+    "strategy_id": "research_small_account_options",
+    "strategy_name": "Research Small Account Options",
+    "variant": "spy_iron_condor_proxy",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY only. Monthly 30-60 DTE iron-condor proxy because the local cache does not carry consistent 0DTE chains across the full backtest window.",
+    "description": "Small-account SPY iron-condor research profile using one defined-risk monthly condor at a time with max risk capped below $1,000 per position.",
+    "hypothesis": "A single small defined-risk SPY condor can preserve the capital-efficiency point from the transcript without pretending the repo has consistent 0DTE support.",
+    "entry_rules": [
+      "SPY only",
+      "DTE 30-60",
+      "Short put delta roughly -0.12 and short call delta roughly +0.12",
+      "Buy the next OTM wing on each side",
+      "Only enter when HV20 is moderate and trend is roughly neutral",
+      "Max risk per condor <= $1,000"
+    ],
+    "management_rules": [
+      "Take profit after 50% of credit",
+      "Stop if close cost reaches 2.0x entry credit",
+      "Close at 7 DTE",
+      "Close on short-strike breach"
+    ]
+  },
+  {
+    "strategy_id": "research_small_account_options",
+    "strategy_name": "Research Small Account Options",
+    "variant": "msft_bull_call_spread",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "MSFT only. Uses 30-60 DTE call spreads because the local cache does not provide enough true 1-year debit-spread opportunities to make the transcript example backtestable at scale.",
+    "description": "Small-account MSFT bull call spread profile using one bullish debit spread at a time with net debit capped below $1,000 per trade.",
+    "hypothesis": "A debit-capped MSFT bull call spread can express the transcript's capital-efficiency idea while staying inside liquid expirations that the cache supports consistently.",
+    "entry_rules": [
+      "MSFT only",
+      "DTE 30-60",
+      "Long call delta roughly 0.60",
+      "Short call delta roughly 0.30, same expiry and higher strike",
+      "Bullish trend filter (price above MA20 and MA20 above MA50)",
+      "Net debit between $100 and $1,000"
+    ],
+    "management_rules": [
+      "Take profit after capturing about 60% of max gain",
+      "Stop if spread value falls to roughly 55% of entry debit",
+      "Close at 14 DTE",
+      "Close on bearish trend break"
+    ]
+  },
+  {
+    "strategy_id": "research_small_account_options",
+    "strategy_name": "Research Small Account Options",
+    "variant": "aapl_bull_put_45_21",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "AAPL only. Uses real 38-52 DTE put spreads, a trailing IV percentile filter, and a forced 21-DTE exit to mirror the video's premium-selling framework on a liquid single name.",
+    "description": "AAPL bull put spread profile inspired by the video's preference for selling expensive premium: target about 45 DTE, require elevated IV percentile, place the short put below recent support, and exit no later than 21 DTE.",
+    "hypothesis": "Selling a defined-risk AAPL put spread only when implied volatility is expensive and the short strike sits below support should improve probability of profit versus buying naked calls.",
+    "entry_rules": [
+      "AAPL only",
+      "DTE 38-52, targeting about 45 DTE",
+      "IV percentile >= 65",
+      "Bullish trend filter: price above MA50 and MA200, MA20 above MA50",
+      "Short put delta roughly -0.27 inside a -0.40 to -0.15 range",
+      "Breakeven and short strike must both sit below the support reference",
+      "Max spread risk <= $1,000"
+    ],
+    "management_rules": [
+      "Always exit by 21 DTE",
+      "Stop if close cost reaches 2.0x entry credit",
+      "Close on short-strike breach",
+      "Close on trend break below MA50"
+    ]
+  },
+  {
+    "strategy_id": "research_small_account_options",
+    "strategy_name": "Research Small Account Options",
+    "variant": "aapl_long_call_low_iv",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "AAPL only. This is the low-IV buying counterpart to the 45/21 premium-selling setup, using one 38-52 DTE long call at a time.",
+    "description": "AAPL long call profile that buys premium only when IV percentile is historically cheap, with the same 45-DTE targeting and 21-DTE forced exit window used in the video's trade-management rule.",
+    "hypothesis": "If the video's IV logic is directionally right, long calls should perform better when volatility is cheap, while the bull put spread should dominate when volatility is expensive.",
+    "entry_rules": [
+      "AAPL only",
+      "DTE 38-52, targeting about 45 DTE",
+      "IV percentile <= 35",
+      "Bullish trend filter: price above MA20, MA50, and MA200 with MA20 above MA50",
+      "Long call delta roughly 0.60 inside a 0.45 to 0.75 range",
+      "Net debit between $100 and $1,000"
+    ],
+    "management_rules": [
+      "Always exit by 21 DTE",
+      "Stop if option value falls to about 55% of entry debit",
+      "Close on bearish trend break"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Small-Account Long-Dated ITM",
+    "variant": "small_account_long_dated_itm",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Top-50 universe. Long-dated deep ITM call proxy using the longest liquid DTE bucket present in the local cache rather than true 365+ LEAPS.",
+    "description": "Small-account long-dated ITM call profile: one contract max, one position max, contract cost capped at $1,000, 120-200 DTE, deep ITM and low-extrinsic only.",
+    "hypothesis": "Capping contract cost while keeping high-delta, low-extrinsic long calls may preserve stock-replacement behavior in a form that a small account can actually fund."
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "DITM Stage-2 Liquid",
+    "variant": "ditm_stage2_liquid",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Designed for the default or top_50 stock-replacement universes. The local cache does not include open-interest values, so the 250-OI rule is encoded but cannot be enforced historically; liquidity is instead constrained through spread caps.",
+    "description": "Short-DTE deep ITM stock replacement profile based on the transcript's high-delta call framework: 0.80 delta target, max 30% extrinsic, Stage-2 trend gate, and a hard $0.50 bid/ask spread cap.",
+    "hypothesis": "Using shorter-dated deep ITM calls with tight spread control and Stage-2 trend confirmation should increase capital efficiency without paying the full LEAPS time premium.",
+    "entry_rules": [
+      "Target delta near 0.80 with minimum 0.70",
+      "Extrinsic <= 30% of ask, ideal near 20%",
+      "Bid/ask spread <= 12% of ask and <= $0.50 absolute",
+      "DTE 14-28 with final week avoided",
+      "Bullish Stage-2 trend: 10 EMA > 20 EMA and price > 50 EMA"
+    ],
+    "management_rules": [
+      "Exit on bearish 10/20 EMA cross",
+      "Roll when delta falls below the minimum threshold",
+      "Roll during the final week before expiration"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
+    "strategy_name": "DITM Cash-Gated 30-60",
+    "variant": "ditm_cash_gated_30_60",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Designed for the default or top_50 stock-replacement universes. Uses the same absolute spread cap as ditm_stage2_liquid, but only enters when both the symbol and SPY regime are bullish.",
+    "description": "30-60 DTE deep ITM stock replacement variant that keeps the Stage-2 trend discipline, extends the holding window, and sits in cash when SPY is bearish.",
+    "hypothesis": "A longer DTE window plus an SPY cash-regime gate should reduce whipsaw and improve out-of-sample stability versus the shorter 14-28 DTE DITM profile.",
+    "entry_rules": [
+      "Target delta near 0.80 with minimum 0.70",
+      "Extrinsic <= 30% of ask, ideal near 20%",
+      "Bid/ask spread <= 10% of ask and <= $0.50 absolute",
+      "DTE 30-60, monthlys preferred",
+      "Bullish Stage-2 trend: 10 EMA > 20 EMA and price > 50 EMA",
+      "SPY must also be in bullish 10/20/50 EMA trend"
+    ],
+    "management_rules": [
+      "Exit on bearish 10/20 EMA cross",
+      "Roll when delta falls below the minimum threshold",
+      "Roll during the final week before expiration",
+      "Sit in cash while SPY regime is bearish"
     ]
   }
 ]

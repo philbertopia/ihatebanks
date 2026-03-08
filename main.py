@@ -79,6 +79,24 @@ def load_watchlist(watchlist_path: str = "config/watchlist.yaml") -> list:
     return load_universe("default", watchlist_path=watchlist_path)
 
 
+def default_strategy_name(strategy_id: str) -> str:
+    names = {
+        "stock_replacement": "Stock Replacement",
+        "intraday_open_close_options": "Intraday Open-Close Options",
+        "openclaw_stock_options": "OpenClaw Stock Options",
+        "openclaw_put_credit_spread": "OpenClaw Put Credit Spread",
+        "openclaw_call_credit_spread": "OpenClaw Call Credit Spread",
+        "openclaw_regime_credit_spread": "OpenClaw Regime Credit Spread",
+        "openclaw_tqqq_swing": "OpenClaw TQQQ Swing",
+        "openclaw_hybrid": "OpenClaw Hybrid",
+        "research_putwrite_spy": "Research PutWrite SPY",
+        "research_buywrite_spy": "Research BuyWrite SPY",
+        "research_collar_spy": "Research Collar SPY",
+        "research_small_account_options": "Research Small Account Options",
+    }
+    return names.get(strategy_id, strategy_id.replace("_", " ").title())
+
+
 def resolve_universe(args, config: dict) -> Tuple[str, List[str]]:
     profile = (getattr(args, "universe", None) or "").strip()
     if not profile:
@@ -851,6 +869,44 @@ def cmd_generate(args, config, repo, clients):
     )
 
 
+def cmd_validate_polygon(args, config, repo, clients):
+    """Validate synthetic Parquet cache against live Polygon option snapshots."""
+    from ovtlyr.api.polygon_client import validate_cache_vs_polygon, print_validation_report
+
+    polygon_cfg = config.get("polygon", {})
+    api_key = polygon_cfg.get("api_key", "")
+    if not api_key:
+        print("ERROR: No Polygon API key configured. Add 'polygon.api_key' to config/settings.yaml")
+        return
+
+    underlying = getattr(args, "underlying", None) or "SPY"
+    cache_dir = "data/cache"
+    max_delta_deviation = float(polygon_cfg.get("max_delta_deviation", 0.03))
+
+    print(f"Validating synthetic cache vs Polygon for: {underlying}")
+    print(f"Cache directory: {cache_dir}")
+    try:
+        df = validate_cache_vs_polygon(
+            cache_dir=cache_dir,
+            underlying=underlying,
+            api_key=api_key,
+        )
+        print_validation_report(df, max_delta_deviation=max_delta_deviation)
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}")
+        print("Run 'python main.py generate' first to build the cache.")
+    except Exception as e:
+        msg = str(e)
+        if "401" in msg or "Unauthorized" in msg:
+            print(f"ERROR: Polygon API returned 401 Unauthorized.")
+            print("  The options snapshot endpoint (/v3/snapshot/options) requires a paid")
+            print("  Polygon plan (Starter or above). Verify your API key and subscription at")
+            print("  https://polygon.io/dashboard")
+        else:
+            print(f"ERROR: {e}")
+            raise
+
+
 def cmd_intraday_report(args, config, repo, clients):
     """Generate one-day intraday open→close candidate ranking report."""
     from ovtlyr.backtester.data_collector import BacktestDataCollector
@@ -947,7 +1003,7 @@ def cmd_backtest(args, config, repo, clients):
     from ovtlyr.backtester.data_collector import BacktestDataCollector
 
     strategy_id = args.strategy_id or "stock_replacement"
-    strategy_name = args.strategy_name or "Stock Replacement"
+    strategy_name = args.strategy_name or default_strategy_name(strategy_id)
     variant = args.variant or "base"
     normalized_variant = (
         normalize_variant(variant) if strategy_id == "stock_replacement" else variant
@@ -983,6 +1039,8 @@ def cmd_backtest(args, config, repo, clients):
     rejection_counts = None
     execution_window = None
     component_metrics = None
+    actual_universe = ",".join(universe_symbols)
+    actual_universe_size = len(universe_symbols)
 
     # Check if this is a wheel strategy
     strategy_type = effective_config.get("strategy", {}).get("strategy_type", "")
@@ -1040,6 +1098,8 @@ def cmd_backtest(args, config, repo, clients):
         rejection_counts = output.rejection_counts
         execution_window = output.execution_window
         component_metrics = output.component_metrics
+        actual_universe = output.universe or actual_universe
+        actual_universe_size = len([s for s in str(actual_universe).split(",") if s.strip()])
 
     _print_backtest_metrics("BACKTEST RESULTS", metrics)
 
@@ -1101,8 +1161,8 @@ def cmd_backtest(args, config, repo, clients):
             "rows": int(len(data)),
         },
         "universe_profile": universe_profile,
-        "universe_size": len(universe_symbols),
-        "universe": ",".join(universe_symbols),
+        "universe_size": actual_universe_size,
+        "universe": actual_universe,
         "notes": args.notes or "",
         "period_key": period_key,
         "walkforward_id": (oos_summary or {}).get("walkforward_id"),
@@ -1132,7 +1192,7 @@ def cmd_backtest_walkforward(args, config, repo, clients):
     )
 
     strategy_id = args.strategy_id or "stock_replacement"
-    strategy_name = args.strategy_name or "Stock Replacement"
+    strategy_name = args.strategy_name or default_strategy_name(strategy_id)
     variant = args.variant or "base"
     normalized_variant = (
         normalize_variant(variant) if strategy_id == "stock_replacement" else variant
@@ -1169,6 +1229,8 @@ def cmd_backtest_walkforward(args, config, repo, clients):
     )
 
     is_wheel_wf = strategy_id == "stock_replacement" and normalized_variant.startswith("wheel_")
+    actual_universe = ",".join(universe_symbols)
+    actual_universe_size = len(universe_symbols)
 
     wf_rows: List[Dict[str, Any]] = []
     oos_metrics: List[Dict[str, Any]] = []
@@ -1199,6 +1261,8 @@ def cmd_backtest_walkforward(args, config, repo, clients):
                 assumptions_mode=normalized_variant,
                 universe_symbols=universe_symbols,
             )
+            actual_universe = output.universe or actual_universe
+            actual_universe_size = len([s for s in str(actual_universe).split(",") if s.strip()])
             m = output.metrics
             if warm_start < w.test_start:
                 m = _metrics_from_equity_window(
@@ -1225,7 +1289,9 @@ def cmd_backtest_walkforward(args, config, repo, clients):
         "wheel":                        {"sharpe": 0.40, "max_dd": 35.0},
         "stock_replacement":            {"sharpe": 0.30, "max_dd": 35.0},
         "openclaw_call_credit_spread":  {"sharpe": 0.70, "max_dd": 30.0},
+        "openclaw_regime_credit_spread": {"sharpe": 0.70, "max_dd": 30.0},
         "openclaw_put_credit_spread":   {"sharpe": 0.70, "max_dd": 30.0},
+        "research_small_account_options": {"sharpe": 0.40, "max_dd": 35.0},
     }
     if is_wheel_wf:
         _family_key = "wheel"
@@ -1253,8 +1319,8 @@ def cmd_backtest_walkforward(args, config, repo, clients):
         "strategy_name": strategy_name,
         "variant": normalized_variant,
         "universe_profile": universe_profile,
-        "universe_size": len(universe_symbols),
-        "universe": ",".join(universe_symbols),
+        "universe_size": actual_universe_size,
+        "universe": actual_universe,
         "train_days": train_days,
         "test_days": test_days,
         "step_days": step_days,
@@ -1443,6 +1509,12 @@ def cmd_backtest_batch(args, config, repo, clients):
             "Legacy params + HV30 gate for moderate-volatility premium collection",
         ),
         (
+            "openclaw_put_credit_spread",
+            "OpenClaw Put Credit Spread",
+            "qqq_falling_knife",
+            "QQQ-only selloff income PCS inspired by a high-POP falling-knife setup",
+        ),
+        (
             "openclaw_tqqq_swing",
             "OpenClaw TQQQ Swing",
             "legacy_replica",
@@ -1604,6 +1676,36 @@ def cmd_backtest_batch(args, config, repo, clients):
         # Wheel strategy (CSP → Covered Call → repeat)
         (
             "stock_replacement",
+            "Small-Account Long-Dated ITM",
+            "small_account_long_dated_itm",
+            "Long-dated deep ITM call capped at $1,000/contract â€” small-account proxy for LEAPS-style stock replacement",
+        ),
+        (
+            "stock_replacement",
+            "DITM Stage-2 Liquid",
+            "ditm_stage2_liquid",
+            "Short-DTE deep ITM stock replacement with Stage-2 trend gate, max 30% extrinsic, and a $0.50 absolute spread cap",
+        ),
+        (
+            "stock_replacement",
+            "DITM Cash-Gated 30-60",
+            "ditm_cash_gated_30_60",
+            "Deep ITM stock replacement with 30-60 DTE, SPY cash-regime gating, and a $0.50 absolute spread cap",
+        ),
+        (
+            "stock_replacement",
+            "Full Filter IV Rank Trend Liquid",
+            "full_filter_iv_rank_trend_liquid",
+            "full_filter_iv_rank tightened with symbol-trend discipline and stricter option-quality rules for OOS robustness",
+        ),
+        (
+            "stock_replacement",
+            "Full Filter IV RS Trend Liquid",
+            "full_filter_iv_rs_trend_liquid",
+            "full_filter_iv_rs tightened with symbol-trend discipline and stricter option-quality rules for OOS robustness",
+        ),
+        (
+            "stock_replacement",
             "Wheel Strategy",
             "wheel_d30_c30",
             "Wheel: sell -0.30 delta CSP → if assigned sell 0.30 delta covered call",
@@ -1638,6 +1740,66 @@ def cmd_backtest_batch(args, config, repo, clients):
             "Call Credit Spread Defensive",
             "ccs_defensive",
             "CCS defensive: 6% OTM short strike, tighter sizing — lower delta, lower risk",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "regime_balanced",
+            "Rotates legacy PCS in bullish regimes and CCS baseline in bearish/neutral regimes",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "regime_defensive",
+            "Rotates VIX-gated PCS and defensive CCS to reduce regime concentration with tighter call entries",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "regime_legacy_defensive",
+            "Pairs legacy PCS upside capture with defensive CCS entries across bearish and neutral regimes",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "regime_vix_baseline",
+            "Pairs VIX-gated PCS upside capture with CCS baseline entries across bearish and neutral regimes",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "regime_legacy_defensive_bear_only",
+            "Runs legacy PCS in bullish regimes and defensive CCS only in outright bearish regimes, sitting out neutral periods",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "regime_vix_baseline_bear_only",
+            "Runs VIX-gated PCS in bullish regimes and CCS baseline only in outright bearish regimes, sitting out neutral periods",
+        ),
+        (
+            "research_small_account_options",
+            "Research Small Account Options",
+            "spy_iron_condor_proxy",
+            "Small-account SPY iron condor proxy using monthly 30-60 DTE chains with capped max risk",
+        ),
+        (
+            "research_small_account_options",
+            "Research Small Account Options",
+            "msft_bull_call_spread",
+            "Small-account MSFT bull call spread using 30-60 DTE chain selection with debit capped at $1,000",
+        ),
+        (
+            "research_small_account_options",
+            "Research Small Account Options",
+            "aapl_bull_put_45_21",
+            "AAPL bull put spread using a high-IV filter, support-aware short strike placement, and 45/21 management",
+        ),
+        (
+            "research_small_account_options",
+            "Research Small Account Options",
+            "aapl_long_call_low_iv",
+            "AAPL long call using a low-IV filter as the buying counterpart to the 45/21 premium-selling setup",
         ),
     ]
     period_key = start.strftime("%Y-%m")
@@ -2071,6 +2233,7 @@ def main():
             "intraday-report",
             "backtest-walkforward",
             "intraday-sweep-validate",
+            "validate-polygon",
         ],
     )
     parser.add_argument(
@@ -2137,6 +2300,12 @@ def main():
         "--notes", type=str, default="", help="Optional notes for this backtest run"
     )
     parser.add_argument(
+        "--underlying",
+        type=str,
+        default=None,
+        help="Underlying ticker for validate-polygon (default: SPY)",
+    )
+    parser.add_argument(
         "--train-days",
         type=int,
         default=504,
@@ -2193,6 +2362,7 @@ def main():
         "intraday-report": cmd_intraday_report,
         "backtest-walkforward": cmd_backtest_walkforward,
         "intraday-sweep-validate": cmd_intraday_sweep_validate,
+        "validate-polygon": cmd_validate_polygon,
     }
 
     commands[args.command](args, config, repo, clients)

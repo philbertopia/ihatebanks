@@ -628,5 +628,341 @@
       },
       "walkforward_id": "intraday_open_close_options:wf_v4_validated_candidate:wf-202001:20260306T190032Z"
     }
+  },
+  "openclaw_regime_credit_spread|regime_balanced|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:regime_balanced:wf-202001:20260308T114807Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "regime_balanced",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T11:48:07.368545+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 16.58,
+      "avg_sharpe_ratio": 5.933,
+      "avg_max_drawdown_pct": 1.4978,
+      "pass_validation": true,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:regime_balanced:wf-202001:20260308T114807Z"
+    }
+  },
+  "openclaw_regime_credit_spread|regime_defensive|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:regime_defensive:wf-202001:20260308T114850Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "regime_defensive",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T11:48:50.846121+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 15.9387,
+      "avg_sharpe_ratio": 6.5514,
+      "avg_max_drawdown_pct": 1.1674,
+      "pass_validation": true,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:regime_defensive:wf-202001:20260308T114850Z"
+    }
+  },
+  "openclaw_put_credit_spread|qqq_falling_knife|top_50": {
+    "walkforward_id": "openclaw_put_credit_spread:qqq_falling_knife:wf-202001:20260308T153204Z",
+    "strategy_id": "openclaw_put_credit_spread",
+    "strategy_name": "OpenClaw Put Credit Spread",
+    "variant": "qqq_falling_knife",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T15:32:04.705225+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 0.395,
+      "avg_sharpe_ratio": -6.4004,
+      "avg_max_drawdown_pct": 0.0528,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_put_credit_spread:qqq_falling_knife:wf-202001:20260308T153204Z"
+    }
+  },
+  "research_small_account_options|spy_iron_condor_proxy|top_50": {
+    "walkforward_id": "research_small_account_options:spy_iron_condor_proxy:wf-202401:20260308T193714Z",
+    "strategy_id": "research_small_account_options",
+    "strategy_name": "Research Small Account Options",
+    "variant": "spy_iron_condor_proxy",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T19:37:14.422189+00:00",
+    "oos_summary": {
+      "windows": 4,
+      "avg_total_return_pct": 0.0134,
+      "avg_sharpe_ratio": -15.7776,
+      "avg_max_drawdown_pct": 0.0095,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_small_account_options:spy_iron_condor_proxy:wf-202401:20260308T193714Z"
+    }
+  },
+  "research_small_account_options|msft_bull_call_spread|top_50": {
+    "walkforward_id": "research_small_account_options:msft_bull_call_spread:wf-202401:20260308T193817Z",
+    "strategy_id": "research_small_account_options",
+    "strategy_name": "Research Small Account Options",
+    "variant": "msft_bull_call_spread",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T19:38:17.130657+00:00",
+    "oos_summary": {
+      "windows": 4,
+      "avg_total_return_pct": 1.0008,
+      "avg_sharpe_ratio": 0.1383,
+      "avg_max_drawdown_pct": 1.0295,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_small_account_options:msft_bull_call_spread:wf-202401:20260308T193817Z"
+    }
+  },
+  "stock_replacement|small_account_long_dated_itm|top_50": {
+    "walkforward_id": "stock_replacement:small_account_long_dated_itm:wf-202401:20260308T194010Z",
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Small-Account Long-Dated ITM",
+    "variant": "small_account_long_dated_itm",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T19:40:10.147104+00:00",
+    "oos_summary": {
+      "windows": 4,
+      "avg_total_return_pct": -0.6677,
+      "avg_sharpe_ratio": -3.1427,
+      "avg_max_drawdown_pct": 1.1581,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.3,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "stock_replacement:small_account_long_dated_itm:wf-202401:20260308T194010Z"
+    }
+  },
+  "research_small_account_options|aapl_bull_put_45_21|top_50": {
+    "walkforward_id": "research_small_account_options:aapl_bull_put_45_21:wf-202001:20260308T200419Z",
+    "strategy_id": "research_small_account_options",
+    "strategy_name": "Stock Replacement",
+    "variant": "aapl_bull_put_45_21",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T20:04:19.008135+00:00",
+    "oos_summary": {
+      "windows": 20,
+      "avg_total_return_pct": -0.0221,
+      "avg_sharpe_ratio": -23.6603,
+      "avg_max_drawdown_pct": 0.032,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_small_account_options:aapl_bull_put_45_21:wf-202001:20260308T200419Z"
+    }
+  },
+  "research_small_account_options|aapl_long_call_low_iv|top_50": {
+    "walkforward_id": "research_small_account_options:aapl_long_call_low_iv:wf-202001:20260308T200758Z",
+    "strategy_id": "research_small_account_options",
+    "strategy_name": "Stock Replacement",
+    "variant": "aapl_long_call_low_iv",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T20:07:58.078076+00:00",
+    "oos_summary": {
+      "windows": 20,
+      "avg_total_return_pct": 0.0739,
+      "avg_sharpe_ratio": -7.2757,
+      "avg_max_drawdown_pct": 0.3688,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_small_account_options:aapl_long_call_low_iv:wf-202001:20260308T200758Z"
+    }
+  },
+  "stock_replacement|ditm_stage2_liquid|top_50": {
+    "walkforward_id": "stock_replacement:ditm_stage2_liquid:wf-202001:20260308T203244Z",
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "ditm_stage2_liquid",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T20:32:44.574116+00:00",
+    "oos_summary": {
+      "windows": 20,
+      "avg_total_return_pct": -5.9335,
+      "avg_sharpe_ratio": -0.3363,
+      "avg_max_drawdown_pct": 17.4906,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.3,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "stock_replacement:ditm_stage2_liquid:wf-202001:20260308T203244Z"
+    }
+  },
+  "stock_replacement|ditm_cash_gated_30_60|top_50": {
+    "walkforward_id": "stock_replacement:ditm_cash_gated_30_60:wf-202001:20260308T211306Z",
+    "strategy_id": "stock_replacement",
+    "strategy_name": "DITM Cash-Gated 30-60",
+    "variant": "ditm_cash_gated_30_60",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T21:13:06.475045+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": -2.5239,
+      "avg_sharpe_ratio": -0.1328,
+      "avg_max_drawdown_pct": 24.3784,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.3,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "stock_replacement:ditm_cash_gated_30_60:wf-202001:20260308T211306Z"
+    }
+  },
+  "stock_replacement|full_filter_iv_rank_trend_liquid|top_50": {
+    "walkforward_id": "stock_replacement:full_filter_iv_rank_trend_liquid:wf-202001:20260308T213144Z",
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Full Filter IV Rank Trend Liquid",
+    "variant": "full_filter_iv_rank_trend_liquid",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T21:31:44.554480+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 1.3483,
+      "avg_sharpe_ratio": -0.126,
+      "avg_max_drawdown_pct": 24.4369,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.3,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "stock_replacement:full_filter_iv_rank_trend_liquid:wf-202001:20260308T213144Z"
+    }
+  },
+  "stock_replacement|full_filter_iv_rs_trend_liquid|top_50": {
+    "walkforward_id": "stock_replacement:full_filter_iv_rs_trend_liquid:wf-202001:20260308T215417Z",
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Full Filter IV RS Trend Liquid",
+    "variant": "full_filter_iv_rs_trend_liquid",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T21:54:17.994968+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 1.3721,
+      "avg_sharpe_ratio": -0.2917,
+      "avg_max_drawdown_pct": 20.7971,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.3,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "stock_replacement:full_filter_iv_rs_trend_liquid:wf-202001:20260308T215417Z"
+    }
+  },
+  "openclaw_regime_credit_spread|regime_legacy_defensive|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:regime_legacy_defensive:wf-201601:20260308T224527Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "regime_legacy_defensive",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T22:45:27.409296+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 17.3822,
+      "avg_sharpe_ratio": 7.2857,
+      "avg_max_drawdown_pct": 1.1404,
+      "pass_validation": true,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:regime_legacy_defensive:wf-201601:20260308T224527Z"
+    }
+  },
+  "openclaw_regime_credit_spread|regime_vix_baseline|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:regime_vix_baseline:wf-202001:20260308T221218Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "regime_vix_baseline",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T22:12:18.681806+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 14.9992,
+      "avg_sharpe_ratio": 5.18,
+      "avg_max_drawdown_pct": 1.6033,
+      "pass_validation": true,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:regime_vix_baseline:wf-202001:20260308T221218Z"
+    }
+  },
+  "openclaw_regime_credit_spread|regime_legacy_defensive_bear_only|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:regime_legacy_defensive_bear_only:wf-202001:20260308T221446Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "regime_legacy_defensive_bear_only",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T22:14:46.552969+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 14.1731,
+      "avg_sharpe_ratio": 5.7186,
+      "avg_max_drawdown_pct": 1.1927,
+      "pass_validation": true,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:regime_legacy_defensive_bear_only:wf-202001:20260308T221446Z"
+    }
+  },
+  "openclaw_regime_credit_spread|regime_vix_baseline_bear_only|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:regime_vix_baseline_bear_only:wf-202001:20260308T221707Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "regime_vix_baseline_bear_only",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-08T22:17:07.449575+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 12.1371,
+      "avg_sharpe_ratio": 4.0602,
+      "avg_max_drawdown_pct": 1.7441,
+      "pass_validation": true,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:regime_vix_baseline_bear_only:wf-202001:20260308T221707Z"
+    }
   }
 }
