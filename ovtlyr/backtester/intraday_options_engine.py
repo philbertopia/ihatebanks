@@ -151,35 +151,64 @@ def _build_daily_ratio_history(
     """
     Build per-underlying day-level median vol/oi ratio history for unusual-flow baselines.
     """
-    temp = data.copy()
-    temp["date"] = pd.to_datetime(temp["date"]).dt.date
-    rows = []
-    for _, row in temp.iterrows():
-        sym = str(row["underlying"])
-        day = row["date"]
-        u = underlying_lookup.get((sym, day))
+    by_key: Dict[Tuple[str, date], List[float]] = defaultdict(list)
+    cols = ["date", "underlying", "open_interest", "volume", "delta", "spread_pct"]
+    available_cols = [col for col in cols if col in data.columns]
+    slim = data[available_cols]
+
+    for (day, sym), frame in slim.groupby(["date", "underlying"], sort=True, observed=True):
+        day_key = _to_date(day)
+        sym_key = str(sym)
+        u = underlying_lookup.get((sym_key, day_key))
         if not u:
             continue
-        oi_effective, _ = observed_or_proxy_oi(row.get("open_interest"), safe_float(row.get("spread_pct")))
-        vol_effective, _ = observed_or_proxy_volume(
-            row.get("volume"),
-            safe_float(row.get("delta")),
-            safe_float(u.get("atr_pct")),
-            safe_float(u.get("abs_return_pct")),
-            safe_float(row.get("spread_pct")),
-        )
-        ratio = float(vol_effective) / max(float(oi_effective), 1.0)
-        rows.append((sym, day, ratio))
 
-    by_key: Dict[Tuple[str, date], List[float]] = defaultdict(list)
-    for sym, day, ratio in rows:
-        by_key[(sym, day)].append(ratio)
+        if "spread_pct" in frame.columns:
+            spread = pd.to_numeric(frame["spread_pct"], errors="coerce")
+        else:
+            spread = pd.Series(index=frame.index, dtype=float)
+        spread = spread.fillna(0.02).clip(lower=0.005)
+
+        oi_proxy = ((1.0 / spread) * 4.0).clip(lower=50.0).round()
+        if "open_interest" in frame.columns:
+            oi_source = frame["open_interest"]
+            oi_raw = pd.to_numeric(oi_source, errors="coerce").fillna(0.0).clip(lower=0.0)
+            oi_missing = oi_source.map(lambda value: value is None)
+            oi_effective = oi_raw.where(~oi_missing, oi_proxy)
+        else:
+            oi_effective = oi_proxy
+
+        if "delta" in frame.columns:
+            delta = pd.to_numeric(frame["delta"], errors="coerce")
+        else:
+            delta = pd.Series(index=frame.index, dtype=float)
+        delta = delta.fillna(0.0).abs()
+
+        atr_pct = max(0.0, safe_float(u.get("atr_pct"), 0.0))
+        abs_return_pct = max(0.0, safe_float(u.get("abs_return_pct"), 0.0))
+        vol_proxy = (
+            (delta * 55.0)
+            + (atr_pct * 7.0)
+            + (abs_return_pct * 12.0)
+            + ((1.0 / spread) * 1.5)
+        ).clip(lower=1.0).round()
+        if "volume" in frame.columns:
+            vol_source = frame["volume"]
+            vol_raw = pd.to_numeric(vol_source, errors="coerce").fillna(0.0).clip(lower=0.0)
+            vol_missing = vol_source.map(lambda value: value is None)
+            vol_effective = vol_raw.where(~vol_missing, vol_proxy)
+        else:
+            vol_effective = vol_proxy
+
+        ratios = (vol_effective / oi_effective.clip(lower=1.0)).astype(float)
+        if ratios.empty:
+            continue
+        ratios_sorted = ratios.sort_values(ignore_index=True)
+        by_key[(sym_key, day_key)].append(float(ratios_sorted.iloc[len(ratios_sorted) // 2]))
 
     history: Dict[str, List[Tuple[date, float]]] = defaultdict(list)
     for (sym, day), ratios in by_key.items():
-        ratios_sorted = sorted(ratios)
-        med = ratios_sorted[len(ratios_sorted) // 2]
-        history[sym].append((day, med))
+        history[sym].append((day, ratios[0]))
 
     for sym in list(history.keys()):
         history[sym] = sorted(history[sym], key=lambda t: t[0])
@@ -700,7 +729,10 @@ def run_intraday_open_close_options(
     elif variant.name == "aggressive":
         target_annual_vol = max(target_annual_vol, 0.22)
     max_symbol_notional_pct = float(risk_cfg.get("max_symbol_notional_pct", 0.20))
-    df = data.copy()
+    _dates_raw = pd.to_datetime(data["date"]).dt.date
+    _lookback_start = start_date - pd.tseries.offsets.BDay(30)
+    _lookback_start_date = _lookback_start.date() if hasattr(_lookback_start, "date") else _lookback_start
+    df = data.loc[(_dates_raw >= _lookback_start_date) & (_dates_raw <= end_date)].copy()
     df["date"] = pd.to_datetime(df["date"]).dt.date
 
     underlying_df = _prepare_daily_underlying(df)

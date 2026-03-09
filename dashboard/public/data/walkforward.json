@@ -420,24 +420,25 @@
     }
   },
   "stock_replacement|wheel_d30_c30|top_50": {
-    "walkforward_id": "stock_replacement:wheel_d30_c30:wf-202001:20260306T173241Z",
+    "walkforward_id": "stock_replacement:wheel_d30_c30:wf-202001:20260309T163208Z",
     "strategy_id": "stock_replacement",
-    "strategy_name": "Stock Replacement",
+    "strategy_name": "Wheel Strategy",
     "variant": "wheel_d30_c30",
+    "initial_capital": null,
     "universe_profile": "top_50",
-    "generated_at": "2026-03-06T17:32:41.788967+00:00",
+    "generated_at": "2026-03-09T16:32:08.129867+00:00",
     "oos_summary": {
       "windows": 7,
-      "avg_total_return_pct": 0.451,
-      "avg_sharpe_ratio": 0.6953,
-      "avg_max_drawdown_pct": 21.7597,
+      "avg_total_return_pct": 0.402,
+      "avg_sharpe_ratio": 0.6107,
+      "avg_max_drawdown_pct": 17.638,
       "pass_validation": true,
       "criteria": {
         "sharpe_threshold": 0.4,
         "max_dd_threshold": 35.0,
         "return_threshold": 0.0
       },
-      "walkforward_id": "stock_replacement:wheel_d30_c30:wf-202001:20260306T173241Z"
+      "walkforward_id": "stock_replacement:wheel_d30_c30:wf-202001:20260309T163208Z"
     }
   },
   "stock_replacement|wheel_d20_c30|top_50": {
@@ -1131,6 +1132,474 @@
         "return_threshold": 0.0
       },
       "walkforward_id": "research_index_swing_options:pullback_defensive_45_60_v2:wf-202001:20260309T050927Z"
+    }
+  },
+  "openclaw_regime_credit_spread|timed_legacy_defensive_40_7_r075|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_40_7_r075:wf-202001:20260309T052853Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_40_7_r075",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T05:28:53.277347+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 2.8742,
+      "avg_sharpe_ratio": -0.0272,
+      "avg_max_drawdown_pct": 0.3343,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_40_7_r075:wf-202001:20260309T052853Z"
+    }
+  },
+  "openclaw_regime_credit_spread|timed_legacy_defensive_40_10_r100|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_40_10_r100:wf-202001:20260309T053028Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_40_10_r100",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T05:30:28.572254+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 2.8742,
+      "avg_sharpe_ratio": -0.0272,
+      "avg_max_drawdown_pct": 0.3343,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_40_10_r100:wf-202001:20260309T053028Z"
+    }
+  },
+  "openclaw_regime_credit_spread|timed_legacy_defensive_50_10_r100|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_50_10_r100:wf-202001:20260309T053248Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_50_10_r100",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T05:32:48.261824+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 2.9703,
+      "avg_sharpe_ratio": 0.0576,
+      "avg_max_drawdown_pct": 0.3177,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_50_10_r100:wf-202001:20260309T053248Z"
+    }
+  },
+  "openclaw_regime_credit_spread|timed_legacy_defensive_60_10_r100|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_60_10_r100:wf-202001:20260309T053501Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_60_10_r100",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T05:35:01.933834+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 1.8802,
+      "avg_sharpe_ratio": -0.7625,
+      "avg_max_drawdown_pct": 0.7884,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_60_10_r100:wf-202001:20260309T053501Z"
+    }
+  },
+  "openclaw_regime_credit_spread|timed_legacy_defensive_50_14_r125|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_50_14_r125:wf-202001:20260309T053658Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_50_14_r125",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T05:36:58.442083+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 2.9705,
+      "avg_sharpe_ratio": 0.058,
+      "avg_max_drawdown_pct": 0.3177,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_50_14_r125:wf-202001:20260309T053658Z"
+    }
+  },
+  "openclaw_regime_credit_spread|timed_legacy_defensive_bear_only_40_10_r100|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_bear_only_40_10_r100:wf-202001:20260309T053912Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_bear_only_40_10_r100",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T05:39:12.560212+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 2.0846,
+      "avg_sharpe_ratio": -1.3276,
+      "avg_max_drawdown_pct": 0.3121,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_bear_only_40_10_r100:wf-202001:20260309T053912Z"
+    }
+  },
+  "openclaw_regime_credit_spread|timed_legacy_defensive_bear_only_50_10_r100|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_bear_only_50_10_r100:wf-202001:20260309T054043Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_bear_only_50_10_r100",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T05:40:43.705781+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 2.1812,
+      "avg_sharpe_ratio": -1.2431,
+      "avg_max_drawdown_pct": 0.2955,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_bear_only_50_10_r100:wf-202001:20260309T054043Z"
+    }
+  },
+  "openclaw_regime_credit_spread|timed_legacy_defensive_bear_only_50_7_r075|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_bear_only_50_7_r075:wf-202001:20260309T054209Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_bear_only_50_7_r075",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T05:42:09.472881+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 2.1812,
+      "avg_sharpe_ratio": -1.2431,
+      "avg_max_drawdown_pct": 0.2955,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:timed_legacy_defensive_bear_only_50_7_r075:wf-202001:20260309T054209Z"
+    }
+  },
+  "openclaw_regime_credit_spread|scored_legacy_defensive_s70|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:scored_legacy_defensive_s70:wf-202001:20260309T070529Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "scored_legacy_defensive_s70",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T07:05:29.754243+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 6.0637,
+      "avg_sharpe_ratio": 1.7176,
+      "avg_max_drawdown_pct": 0.6023,
+      "pass_validation": true,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:scored_legacy_defensive_s70:wf-202001:20260309T070529Z"
+    }
+  },
+  "openclaw_regime_credit_spread|scored_legacy_defensive_s75|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:scored_legacy_defensive_s75:wf-202001:20260309T070704Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "scored_legacy_defensive_s75",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T07:07:04.608522+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 4.8824,
+      "avg_sharpe_ratio": 0.6737,
+      "avg_max_drawdown_pct": 0.3155,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:scored_legacy_defensive_s75:wf-202001:20260309T070704Z"
+    }
+  },
+  "openclaw_regime_credit_spread|scored_legacy_defensive_s80|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:scored_legacy_defensive_s80:wf-202001:20260309T070837Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "scored_legacy_defensive_s80",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T07:08:37.893472+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 2.945,
+      "avg_sharpe_ratio": -0.6225,
+      "avg_max_drawdown_pct": 0.2217,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:scored_legacy_defensive_s80:wf-202001:20260309T070837Z"
+    }
+  },
+  "openclaw_regime_credit_spread|scored_legacy_defensive_s75_vol|top_50": {
+    "walkforward_id": "openclaw_regime_credit_spread:scored_legacy_defensive_s75_vol:wf-202001:20260309T071005Z",
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "scored_legacy_defensive_s75_vol",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T07:10:05.118851+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 4.8824,
+      "avg_sharpe_ratio": 0.6737,
+      "avg_max_drawdown_pct": 0.3155,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "openclaw_regime_credit_spread:scored_legacy_defensive_s75_vol:wf-202001:20260309T071005Z"
+    }
+  },
+  "research_index_convex_swing|qqq_pullback_low_iv_30_45|top_50": {
+    "walkforward_id": "research_index_convex_swing:qqq_pullback_low_iv_30_45:wf-202001:20260309T071213Z",
+    "strategy_id": "research_index_convex_swing",
+    "strategy_name": "Research Index Convex Swing",
+    "variant": "qqq_pullback_low_iv_30_45",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T07:12:13.269199+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 0.1129,
+      "avg_sharpe_ratio": -0.4495,
+      "avg_max_drawdown_pct": 0.0,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_index_convex_swing:qqq_pullback_low_iv_30_45:wf-202001:20260309T071213Z"
+    }
+  },
+  "research_index_convex_swing|qqq_breakout_low_iv_30_45|top_50": {
+    "walkforward_id": "research_index_convex_swing:qqq_breakout_low_iv_30_45:wf-202001:20260309T071421Z",
+    "strategy_id": "research_index_convex_swing",
+    "strategy_name": "Research Index Convex Swing",
+    "variant": "qqq_breakout_low_iv_30_45",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T07:14:21.748146+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 0.2804,
+      "avg_sharpe_ratio": -0.9888,
+      "avg_max_drawdown_pct": 0.0086,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_index_convex_swing:qqq_breakout_low_iv_30_45:wf-202001:20260309T071421Z"
+    }
+  },
+  "research_index_convex_swing|tqqq_pullback_low_iv_21_35|top_50": {
+    "walkforward_id": "research_index_convex_swing:tqqq_pullback_low_iv_21_35:wf-202001:20260309T071631Z",
+    "strategy_id": "research_index_convex_swing",
+    "strategy_name": "Research Index Convex Swing",
+    "variant": "tqqq_pullback_low_iv_21_35",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T07:16:31.022750+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 0.0,
+      "avg_sharpe_ratio": 0.0,
+      "avg_max_drawdown_pct": 0.0,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_index_convex_swing:tqqq_pullback_low_iv_21_35:wf-202001:20260309T071631Z"
+    }
+  },
+  "research_index_convex_swing|tqqq_breakout_low_iv_21_35|top_50": {
+    "walkforward_id": "research_index_convex_swing:tqqq_breakout_low_iv_21_35:wf-202001:20260309T071842Z",
+    "strategy_id": "research_index_convex_swing",
+    "strategy_name": "Research Index Convex Swing",
+    "variant": "tqqq_breakout_low_iv_21_35",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T07:18:42.354521+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 0.0,
+      "avg_sharpe_ratio": 0.0,
+      "avg_max_drawdown_pct": 0.0,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_index_convex_swing:tqqq_breakout_low_iv_21_35:wf-202001:20260309T071842Z"
+    }
+  },
+  "stock_replacement|ditm_atr_credit_roll_small_account|default|cap1000": {
+    "walkforward_id": "stock_replacement:ditm_atr_credit_roll_small_account:wf-202407:cap1000:20260309T084533Z",
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "ditm_atr_credit_roll_small_account",
+    "initial_capital": 1000.0,
+    "universe_profile": "default",
+    "generated_at": "2026-03-09T08:45:33.492622+00:00",
+    "oos_summary": {
+      "windows": 4,
+      "avg_total_return_pct": 0.0,
+      "avg_sharpe_ratio": 0.0,
+      "avg_max_drawdown_pct": 0.0,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.3,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "stock_replacement:ditm_atr_credit_roll_small_account:wf-202407:cap1000:20260309T084533Z"
+    }
+  },
+  "stock_replacement|ditm_atr_credit_roll_small_account|top_50|cap5000": {
+    "walkforward_id": "stock_replacement:ditm_atr_credit_roll_small_account:wf-202407:cap5000:20260309T084654Z",
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "ditm_atr_credit_roll_small_account",
+    "initial_capital": 5000.0,
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T08:46:54.999565+00:00",
+    "oos_summary": {
+      "windows": 4,
+      "avg_total_return_pct": -4.1214,
+      "avg_sharpe_ratio": -1.8771,
+      "avg_max_drawdown_pct": 8.7743,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.3,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "stock_replacement:ditm_atr_credit_roll_small_account:wf-202407:cap5000:20260309T084654Z"
+    }
+  },
+  "stock_replacement|ditm_atr_credit_roll_small_account|top_50|cap20000": {
+    "walkforward_id": "stock_replacement:ditm_atr_credit_roll_small_account:wf-202407:cap20000:20260309T084720Z",
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "ditm_atr_credit_roll_small_account",
+    "initial_capital": 20000.0,
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T08:47:20.238481+00:00",
+    "oos_summary": {
+      "windows": 4,
+      "avg_total_return_pct": -1.0304,
+      "avg_sharpe_ratio": -2.5376,
+      "avg_max_drawdown_pct": 2.1936,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.3,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "stock_replacement:ditm_atr_credit_roll_small_account:wf-202407:cap20000:20260309T084720Z"
+    }
+  },
+  "stock_replacement|ditm_atr_credit_roll_small_account|top_50|cap1000": {
+    "walkforward_id": "stock_replacement:ditm_atr_credit_roll_small_account:wf-202407:cap1000:20260309T084744Z",
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Stock Replacement",
+    "variant": "ditm_atr_credit_roll_small_account",
+    "initial_capital": 1000.0,
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T08:47:44.600215+00:00",
+    "oos_summary": {
+      "windows": 4,
+      "avg_total_return_pct": 0.0,
+      "avg_sharpe_ratio": 0.0,
+      "avg_max_drawdown_pct": 0.0,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.3,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "stock_replacement:ditm_atr_credit_roll_small_account:wf-202407:cap1000:20260309T084744Z"
+    }
+  },
+  "stock_replacement|wheel_d30_c20|top_50": {
+    "walkforward_id": "stock_replacement:wheel_d30_c20:wf-202001:20260309T163646Z",
+    "strategy_id": "stock_replacement",
+    "strategy_name": "Wheel Lower Call Cap",
+    "variant": "wheel_d30_c20",
+    "initial_capital": null,
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T16:36:46.842428+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": -0.0206,
+      "avg_sharpe_ratio": 0.4818,
+      "avg_max_drawdown_pct": 18.2643,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "stock_replacement:wheel_d30_c20:wf-202001:20260309T163646Z"
+    }
+  },
+  "intraday_open_close_options|regime_filtered|top_50": {
+    "walkforward_id": "intraday_open_close_options:regime_filtered:wf-201501:20260309T164144Z",
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "regime_filtered",
+    "initial_capital": null,
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T16:41:44.154432+00:00",
+    "oos_summary": {
+      "windows": 15,
+      "avg_total_return_pct": 36.7374,
+      "avg_sharpe_ratio": 1.5609,
+      "avg_max_drawdown_pct": 6.3911,
+      "pass_validation": true,
+      "criteria": {
+        "sharpe_threshold": 0.7,
+        "max_dd_threshold": 30.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "intraday_open_close_options:regime_filtered:wf-201501:20260309T164144Z"
     }
   }
 }

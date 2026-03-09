@@ -1,5 +1,20 @@
 [
   {
+    "type": "lessons",
+    "slug": "lesson-17-small-account-ditm-calls-and-atr-rolling",
+    "title": "Small-account DITM calls and ATR rolling",
+    "summary": "A practical small-account framework: avoid low-payout spread structures when one loser resets weeks of progress, favor deep ITM calls with low extrinsic value, and use 1 ATR roll-for-credit checkpoints to reduce basis.",
+    "published_at": "2026-03-09",
+    "level": "advanced",
+    "tags": [
+      "lesson",
+      "education",
+      "strategy",
+      "small-accounts"
+    ],
+    "estimated_minutes": 20
+  },
+  {
     "type": "articles",
     "slug": "credit-spread-10-year-research-coverage",
     "title": "Credit spread 10-year research coverage",
@@ -14,6 +29,86 @@
       "regime-analysis"
     ],
     "estimated_minutes": 18
+  },
+  {
+    "type": "articles",
+    "slug": "regime-credit-spread-pair-sweep-wave1-etf-expansion",
+    "title": "Regime credit spread pair sweep wave 1 ETF expansion",
+    "summary": "Research-only ETF cohort comparison for the current regime-credit core across SPY, QQQ, IWM, SMH, RSP, HYG, and XLE pairings over the full synthetic 2020-2025 window.",
+    "published_at": "2026-03-09",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "backtesting",
+      "regime-analysis",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 9
+  },
+  {
+    "type": "articles",
+    "slug": "regime-credit-spread-pair-sweep-wave2-crypto-satellites",
+    "title": "Regime credit spread pair sweep wave 2 crypto and satellites",
+    "summary": "Research-only short-window comparison for bitcoin ETF and QQQ-linked single-name satellite pairs around the current regime-credit core.",
+    "published_at": "2026-03-09",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "backtesting",
+      "regime-analysis",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 9
+  },
+  {
+    "type": "articles",
+    "slug": "regime-credit-spread-timed-entry-sweep",
+    "title": "Regime credit spread timed-entry sweep",
+    "summary": "Local sweep of eight timed-entry variants around the current regime credit spread winner. Timing gates produced cleaner trade clustering and low drawdowns, but none of the variants improved on the current winner's out-of-sample profile, so the family leader stays unchanged.",
+    "published_at": "2026-03-09",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "backtesting",
+      "options",
+      "swing-trading",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "articles",
+    "slug": "regime-credit-spread-universe-sweep",
+    "title": "Regime credit spread pair research hub",
+    "summary": "Research-only hub for the correlated-pair sweeps around the current regime credit spread champion, including the original six-pair baseline study, the second-wave ETF expansion, and the shorter crypto plus single-name satellite comparison.",
+    "published_at": "2026-03-09",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "backtesting",
+      "regime-analysis",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
+  },
+  {
+    "type": "articles",
+    "slug": "regime-portfolio-upgrade-comparison",
+    "title": "Regime portfolio upgrade comparison",
+    "summary": "Research-only comparison of portfolio overlays around the current regime credit spread core. The plain core still wins. Drawdown throttling never engaged in the tested window, while the volatility kill-switch reduced return more than it reduced drawdown.",
+    "published_at": "2026-03-09",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "backtesting",
+      "portfolio-construction",
+      "options",
+      "research"
+    ],
+    "estimated_minutes": 10
   },
   {
     "type": "articles",
@@ -1215,7 +1310,7 @@
     "type": "strategy-explainers",
     "slug": "wheel-d30-c30",
     "title": "Wheel D30 C30 Explainer",
-    "summary": "Wheel D30 C30 Explainer covers setup rules, entries, exits, and failure modes for educational use.",
+    "summary": "Classic wheel on liquid stocks: sell a 30-delta cash-secured put, take assignment when it happens, then sell a 30-delta covered call until the shares are called away.",
     "published_at": "2026-03-06",
     "level": "beginner",
     "tags": [

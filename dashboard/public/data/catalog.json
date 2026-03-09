@@ -4,7 +4,7 @@
     "strategy_name": "OpenClaw Put Credit Spread",
     "variant": "legacy_replica",
     "status": "active",
-    "champion": true,
+    "champion": false,
     "universe_note": "Trades SPY + QQQ only \u2014 not affected by stock universe selection",
     "description": "Regime-filtered SPY/QQQ put credit spreads with legacy fill assumptions. Best overall performer: +139% return, 98.6% win rate, 3.87 Sharpe, only 2.1% max drawdown over 2020-2025.",
     "hypothesis": "High hit-rate premium collection via short OTM puts on broad-market ETFs during bullish regimes.",
@@ -117,6 +117,36 @@
     "universe_note": "Uses selected universe profile (default top_50) with moderately tighter flow and liquidity gates",
     "description": "Middle-ground intraday variant between baseline and oos_hardened. Raises liquidity score threshold (0.35 -> 0.42) and unusual-flow gate (1.05x -> 1.10x) while keeping 3 trades/day and 2% allocation to target better OOS stability without sacrificing trade count.",
     "hypothesis": "The baseline's 2024-2025 OOS collapse (from 6496% IS to near-zero) is driven by weak-quality setups that pass a 0.35 liquidity score but fail live. Tightening just 2 filters should recover OOS Sharpe while keeping enough trades to be statistically meaningful."
+  },
+  {
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "conservative_regime_lite",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Uses selected universe profile (default top_50) with the conservative baseline plus light regime alignment",
+    "description": "Conservative baseline plus symbol regime alignment only. Keeps modeled data allowed and sizing unchanged so the test isolates whether light trend filtering improves stability without starving trade count.",
+    "hypothesis": "A light regime gate should remove the worst countertrend entries while preserving enough trades to keep the edge measurable."
+  },
+  {
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "conservative_hist_55",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Uses selected universe profile (default top_50) with conservative baseline thresholds plus historical edge confirmation",
+    "description": "Conservative baseline plus a minimum 55% historical bucket win rate with at least 6 observations. Tests whether similarity-confirmed setups improve selectivity without the zero-trade problem of the hardened variants.",
+    "hypothesis": "Requiring a modest historical edge floor should filter weak pattern matches and improve consistency."
+  },
+  {
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "conservative_scan_quality",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Uses selected universe profile (default top_50) with tighter spread, liquidity, and unusual-flow scanning criteria",
+    "description": "Conservative baseline with tighter scan-quality thresholds and slightly smaller per-trade sizing. Focuses on execution quality instead of hard walk-forward exclusions.",
+    "hypothesis": "Better scan quality and a small sizing trim should improve drawdown stability more efficiently than the zero-trade hardened profiles."
   },
   {
     "strategy_id": "intraday_open_close_options",
@@ -814,6 +844,28 @@
   },
   {
     "strategy_id": "stock_replacement",
+    "strategy_name": "Wheel Lower Call Cap",
+    "variant": "wheel_d30_c20",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Uses top_50 universe. Same 30-delta cash-secured put entry as the default wheel, but covered calls are sold at 20 delta to leave more upside room after assignment.",
+    "description": "Targeted wheel refinement: sell the same -0.30 delta cash-secured put as the baseline wheel, then use a lower-delta 0.20 covered call after assignment. The goal is to keep the core premium-selling engine while reducing upside truncation in the covered-call phase.",
+    "hypothesis": "If the baseline wheel gives up too much rebound upside after assignment, a lower-delta covered call should improve OOS compounding and reduce regret during strong recoveries without changing the CSP entry profile.",
+    "entry_rules": [
+      "Sell put at -0.30 delta (30-60 DTE)",
+      "Collateral: strike price * 100 per contract",
+      "Max 10 CSP positions simultaneously",
+      "Only open new CSP on underlyings not currently wheeling"
+    ],
+    "management_rules": [
+      "If put assigned (stock price < strike at expiry): buy shares, begin CC phase",
+      "Sell covered call at +0.20 delta (20-45 DTE)",
+      "If call assigned (stock price > CC strike): sell shares, return to CSP phase",
+      "Repeat cycle indefinitely"
+    ]
+  },
+  {
+    "strategy_id": "stock_replacement",
     "strategy_name": "Wheel Conservative",
     "variant": "wheel_d20_c30",
     "status": "active",
@@ -1056,10 +1108,10 @@
     "strategy_id": "openclaw_regime_credit_spread",
     "strategy_name": "OpenClaw Regime Credit Spread",
     "variant": "regime_legacy_defensive",
-    "status": "experimental",
-    "champion": false,
+    "status": "active",
+    "champion": true,
     "universe_note": "Trades SPY + QQQ only - keeps the highest-return bullish PCS leg and swaps in the more defensive CCS template on bearish and neutral regimes.",
-    "description": "Hybrid regime-switch spread engine: legacy PCS in bullish regimes, defensive CCS in bearish and neutral regimes, with a tighter overextension guard for short-call entries.",
+    "description": "Walk-forward validated all-weather performer. Combines the legacy PCS in bull markets with a defensive CCS in bear/neutral markets. Result: +189.4% return, OOS Sharpe 7.29, OOS max drawdown 1.14%.",
     "hypothesis": "Keeping the strongest bullish PCS edge while using the lower-delta CCS template on the call side may retain upside compounding and improve regime-switch robustness."
   },
   {
@@ -1091,6 +1143,136 @@
     "universe_note": "Trades SPY + QQQ only - PCS VIX-optimal in bullish regimes, CCS baseline in bearish regimes, and no call entries in neutral regimes.",
     "description": "Bear-only volatility-aware regime switch: PCS VIX-optimal on bullish legs, CCS baseline only in outright bearish regimes, and neutral periods held in cash.",
     "hypothesis": "Using the stricter bullish PCS filter and skipping neutral call-selling may improve OOS discipline by concentrating trades in the most directional regimes."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_40_7_r075",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - same legacy PCS plus defensive CCS regime router, but entries must also pass timed swing gates before opening a spread.",
+    "description": "Timed legacy-defensive regime profile with bullish pullback and bearish/neutral rally-fade gates, 40% profit capture, 7 DTE exits, and 0.75x base risk sizing.",
+    "hypothesis": "Reducing risk and harvesting profits faster may improve OOS quality if the main edge is entry timing rather than longer premium decay."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_40_10_r100",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - timed entry version of the current winner with the same underlying leg templates and standard risk sizing.",
+    "description": "Timed legacy-defensive regime profile using bullish pullback and bearish/neutral rally-fade gates, 40% profit capture, and 10 DTE exits.",
+    "hypothesis": "The strongest regime router may improve if it waits for pullbacks and rally fades instead of opening spreads on every qualifying regime day."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_50_10_r100",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - timed baseline version of the current regime winner.",
+    "description": "Timed legacy-defensive baseline profile using pullback and rally-fade gates with 50% profit capture and 10 DTE exits.",
+    "hypothesis": "Adding timing without changing the underlying spread templates may improve profit quality while preserving the existing regime winner's structure."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_60_10_r100",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - timed entry version of the current winner that asks more from each spread before exiting.",
+    "description": "Timed legacy-defensive regime profile using pullback and rally-fade gates with 60% profit capture and 10 DTE exits.",
+    "hypothesis": "If the timed entries improve edge quality enough, holding for a larger share of credit may increase return without breaking the drawdown bar."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_50_14_r125",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - timed entry version of the current winner with slower exits and larger per-trade risk.",
+    "description": "Timed legacy-defensive regime profile using pullback and rally-fade gates with 50% profit capture, 14 DTE exits, and 1.25x risk sizing.",
+    "hypothesis": "If timing filters reduce bad entries enough, a moderate size increase and slower exit may recover more of the premium opportunity."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_bear_only_40_10_r100",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - timed entry version of the current winner with neutral call entries disabled.",
+    "description": "Timed legacy-defensive bear-only profile using bullish pullback gates for PCS, bearish rally-fade gates for CCS, no neutral call entries, 40% profit capture, and 10 DTE exits.",
+    "hypothesis": "Neutral regimes may dilute the call-side edge; removing them while keeping timed bullish PCS entries could improve OOS discipline."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_bear_only_50_10_r100",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - bear-only timed baseline around the current regime winner.",
+    "description": "Timed legacy-defensive bear-only baseline profile with 50% profit capture, 10 DTE exits, and no neutral call entries.",
+    "hypothesis": "The strongest timed variant may come from keeping only clear bull and bear entries and ignoring neutral regimes entirely."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "timed_legacy_defensive_bear_only_50_7_r075",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades SPY + QQQ only - lower-risk bear-only timed variant with faster exits.",
+    "description": "Timed legacy-defensive bear-only profile with 50% profit capture, 7 DTE exits, 0.75x risk sizing, and no neutral call entries.",
+    "hypothesis": "If timed entries are strongest in clear bull and bear states, the lower-risk bear-only profile may offer the cleanest low-drawdown candidate."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "scored_legacy_defensive_s65",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Softest score-gated version of the current winning legacy-PCS plus defensive-CCS router.",
+    "description": "Score-gated regime credit spread with a 65-point threshold. Bullish sessions route into legacy PCS, bearish and neutral sessions route into defensive CCS, but the score gate is relaxed enough to preserve more entry frequency.",
+    "hypothesis": "A 65-point floor may preserve the champion's breadth while still filtering out the weakest regime setups."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "scored_legacy_defensive_s70",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Reuses the current winning legacy-PCS plus defensive-CCS router, but requires a state-aware setup score before entering.",
+    "description": "Score-gated regime credit spread with a 70-point threshold. Bullish sessions route into legacy PCS, bearish and neutral sessions route into defensive CCS, but only when the active-side setup score clears the threshold.",
+    "hypothesis": "A softer score floor may keep the current winner's trade frequency while filtering out the weakest regime days."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "scored_legacy_defensive_s75",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Mid-threshold score-gated version of the current regime-credit leader.",
+    "description": "Score-gated regime credit spread with a 75-point threshold. Uses the same legacy PCS plus defensive CCS router as the current leader with stricter entry selection.",
+    "hypothesis": "A mid-strength score threshold may improve OOS quality without collapsing trade count."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "scored_legacy_defensive_s80",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Highest-threshold score-gated version of the current regime-credit leader.",
+    "description": "Score-gated regime credit spread with an 80-point threshold. Only the strongest setup-score days can open the legacy PCS or defensive CCS templates.",
+    "hypothesis": "If weak entries are the real drag, the highest threshold should improve OOS quality even if return and trade count fall."
+  },
+  {
+    "strategy_id": "openclaw_regime_credit_spread",
+    "strategy_name": "OpenClaw Regime Credit Spread",
+    "variant": "scored_legacy_defensive_s75_vol",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Score-gated regime router with realized-volatility percentile sizing overlays.",
+    "description": "Score-gated regime credit spread with a 75-point threshold plus volatility-targeted sizing. Risk scales down in high-volatility quartiles and up modestly in low-volatility aligned conditions.",
+    "hypothesis": "Combining a strong setup score with volatility-aware sizing may improve compounding without breaking drawdown discipline."
   },
   {
     "strategy_id": "stock_replacement",
@@ -1394,6 +1576,96 @@
       "CCS leg inherits ccs_defensive management",
       "One position per symbol, max 2 concurrent positions"
     ]
+  },
+  {
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_hybrid_v3",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Third-generation hybrid router designed to produce a more balanced mix of debit and credit spreads across volatility regimes.",
+    "description": "Third-generation index swing hybrid. Refines the v2 routing logic by creating explicit volatility bands for debit spreads (low IV), standard credit spreads (mid IV), and defensive credit spreads (high IV) to improve structural selection.",
+    "hypothesis": "The v2 variants skewed heavily toward debit spreads. By creating explicit IV tiers for different structures (e.g., Bull Call for IVpct<25, legacy PCS for IVpct 25-60, defensive PCS for IVpct>60), the router should achieve a more balanced trade distribution and better all-weather performance.",
+    "entry_rules": [
+      "SPY and QQQ only",
+      "Bull Pullback Trigger: 3-day return between -6.0% and -0.75% with RSI14 <= 50 in a bull regime",
+      "IF IV percentile < 25, routes to 30-45 DTE Bull Call Spread",
+      "IF IV percentile is 25-60, routes to legacy_replica PCS template",
+      "IF IV percentile > 60, routes to pcs_vix_optimal (defensive) PCS template",
+      "Bear/Neutral Rally-Fade Trigger: 3-day return > 1.0% and RSI14 > 55 in a non-bull regime",
+      "IF IV percentile >= 45, routes to ccs_baseline CCS template",
+      "IF IV percentile >= 65, routes to ccs_defensive CCS template"
+    ],
+    "management_rules": [
+      "Each leg inherits the management rules of its underlying template (Bull Call Spread, PCS, CCS).",
+      "One position per symbol, max 2 concurrent positions."
+    ]
+  },
+  {
+    "strategy_id": "research_index_convex_swing",
+    "strategy_name": "Research Index Convex Swing",
+    "variant": "qqq_pullback_low_iv_30_45",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "QQQ only. Low-IV bullish pullback research variant using real QQQ option-chain selection in a 30-45 DTE debit-spread bucket.",
+    "description": "QQQ convex swing pullback profile. In a bullish regime with breadth support and low IV percentile, it buys a 30-45 DTE bull call debit spread after a controlled 3-day pullback.",
+    "hypothesis": "If the repo needs a convex upside sleeve at all, QQQ low-IV pullbacks are the cleanest place to start rather than forcing premium-buying into every regime.",
+    "entry_rules": [
+      "QQQ only",
+      "Bull regime: close > MA200, MA20 > MA50, breadth >= 55, IV percentile < 35",
+      "3-day return between -5% and -1%",
+      "RSI14 <= 48 and close >= MA50",
+      "Bull call debit spread with long delta near 0.60 and short delta near 0.30"
+    ],
+    "management_rules": [
+      "Take profit at 50% of max gain",
+      "Stop at 35% loss of debit",
+      "Time exit at 10 DTE",
+      "Close on bearish trend break"
+    ]
+  },
+  {
+    "strategy_id": "research_index_convex_swing",
+    "strategy_name": "Research Index Convex Swing",
+    "variant": "qqq_breakout_low_iv_30_45",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "QQQ only. Low-IV breakout research variant using real QQQ option-chain selection in a 30-45 DTE debit-spread bucket.",
+    "description": "QQQ convex swing breakout profile. In a bullish regime with supportive breadth and low IV percentile, it buys a 30-45 DTE bull call debit spread on fresh 20-day breakouts.",
+    "hypothesis": "A low-IV breakout may offer a better convex upside profile than pullbacks if the strongest QQQ trends keep extending after new highs.",
+    "entry_rules": [
+      "QQQ only",
+      "Bull regime: close > MA200, MA20 > MA50, breadth >= 55, IV percentile < 35",
+      "Close above prior 20-day high",
+      "5-day return between +2% and +8%",
+      "RSI14 between 55 and 72"
+    ],
+    "management_rules": [
+      "Take profit at 50% of max gain",
+      "Stop at 35% loss of debit",
+      "Time exit at 10 DTE",
+      "Close on bearish trend break"
+    ]
+  },
+  {
+    "strategy_id": "research_index_convex_swing",
+    "strategy_name": "Research Index Convex Swing",
+    "variant": "tqqq_pullback_low_iv_21_35",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "TQQQ only. Intended to use real TQQQ option-chain selection in a 21-35 DTE debit-spread bucket, but local cache coverage may be incomplete.",
+    "description": "TQQQ convex swing pullback profile. In a bullish regime with breadth support and low IV percentile, it looks for a 21-35 DTE bull call debit spread after a controlled pullback.",
+    "hypothesis": "If convex upside belongs anywhere in this repo, a faster TQQQ pullback sleeve may provide the highest upside per trade, but only if real chain coverage is adequate."
+  },
+  {
+    "strategy_id": "research_index_convex_swing",
+    "strategy_name": "Research Index Convex Swing",
+    "variant": "tqqq_breakout_low_iv_21_35",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "TQQQ only. Intended to use real TQQQ option-chain selection in a 21-35 DTE debit-spread bucket, but local cache coverage may be incomplete.",
+    "description": "TQQQ convex swing breakout profile. In a bullish regime with breadth support and low IV percentile, it looks for a 21-35 DTE bull call debit spread on fresh breakouts.",
+    "hypothesis": "A leveraged ETF breakout sleeve could produce the biggest raw upside, but only if the local data can support realistic entries and exits."
   },
   {
     "strategy_id": "stock_replacement",
