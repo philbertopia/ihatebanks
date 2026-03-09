@@ -112,7 +112,8 @@ The strategy uses options rather than stock for leverage: a directional move in 
 
 **Key parameters:**
 - Entry after the first 15-30 minutes of trading (post-open chaos settles)
-- Options selected based on target DTE and strike relative to current price
+ - **Structure:** Long Call (bullish) or Long Put (bearish)
+ - **Strike Selection:** At-the-money (ATM) or slightly OTM (45-50 delta) to maximize gamma exposure
 - Position closed with a fixed profit target or time stop (close everything before 3:55 PM)
 - No overnight holding — the position is always flat at the close
 
@@ -122,7 +123,7 @@ The strategy uses options rather than stock for leverage: a directional move in 
 
 The metrics that matter for intraday trading are different from multi-week strategies:
 
-**Execution drag is larger as a percentage of profit.** A $0.20 bid/ask spread is minor on a position held for 3 weeks. On an intraday trade collecting $0.30 in premium, that same $0.20 spread is 67% of the potential profit.
+**Execution drag is larger as a percentage of profit.** A $0.20 bid/ask spread is minor on a position held for 3 weeks. On an intraday trade targeting $0.30 in profit per share, that same $0.20 spread is 67% of the potential gain.
 
 **Turnover amplifies everything.** A strategy that trades every day over 250 trading days has 250 opportunities for execution errors, emotional decisions, and bad fills. Each one compounds.
 
@@ -141,6 +142,40 @@ When you look at the Intraday Open-Close strategy results on this site:
 
 The OOS validation for intraday strategies covers the same walk-forward methodology but evaluated on shorter return windows, since each "trade" represents a single day rather than a multi-week position.
 
+---
+
+## Regime dependence: the hidden fragility in intraday strategies
+
+One of the most important discoveries from testing the Intraday Open-Close strategy across a full 10-year period (2015–2026) is that intraday directional options strategies are **regime-dependent** in ways that short backtests hide.
+
+The `conservative` variant shows a stunning **+2127% return over 5 years (2020–2025)** — but when the backtest is extended to 10 years (2015–2026), results deteriorate sharply:
+
+| Period | Return | Sharpe | Max DD |
+|---|---|---|---|
+| 5-year (2020–2025) | +2127% | 3.48 | 10.1% |
+| 10-year (2015–2026) | +594% | 0.67 | 39.1% |
+
+The culprit is **regime drag**: the years 2015–2019 and 2024 were characterized by low implied volatility and compressed intraday ranges. During these periods, the strategy's edge essentially disappears — options are cheap, moves are small, and the ATR and unusual-flow signals that drive entry produce marginal setups rather than strong ones.
+
+### Out-of-sample walk-forward confirms the problem
+
+The OOS walk-forward test across 7 non-overlapping windows produced an average Sharpe of **-1.08** for the conservative variant. This means the strategy, as constructed, does not pass real out-of-sample validation. The in-sample equity curve is real historical profit — but it cannot be relied upon to repeat in future unseen periods.
+
+### The fix: regime alignment gate
+
+Adding a **regime alignment requirement** — which gates entries on whether current intraday volatility conditions match a favorable historical regime — transforms the strategy:
+
+| Variant | Return (10yr) | Sharpe | Max DD | OOS Validated |
+|---|---|---|---|---|
+| conservative | +594% | 0.67 | 39.1% | ❌ Fails |
+| **regime_filtered** | **+909%** | **1.80** | **8.1%** | **✅ Passes** |
+
+The regime gate rejects roughly 60% of trade candidates — specifically the ones in unfavorable market conditions. The remaining 1109 trades over 10 years (vs 2742 without the gate) have a **68.7% win rate and 8.1% max drawdown**. The OOS walk-forward across 15 windows shows an average Sharpe of **1.56** and average return of **+36.7% per window**.
+
+**The lesson:** A strategy that works brilliantly in high-vol regimes but fails in low-vol regimes is not a robust strategy — it's a regime bet. The solution is not to hide the problem with shorter backtests; it's to add an explicit filter that makes the regime dependency a feature rather than a hidden risk.
+
+---
+
 ## Apply it
 
-Open the [Strategies](/strategies) page and compare the Intraday Open-Close strategy metrics against the Put Credit Spread. Notice the differences in total trades, average hold time, and win rate. Consider: given the same capital, which strategy produces smoother returns? Which has higher maximum drawdown? The differences reveal the tradeoffs between high-turnover intraday trading and patient multi-week premium collection.
+Open the [Strategies](/strategies) page and compare the Intraday Open-Close strategy metrics across variants. Look for the OOS validation badge — only strategies marked as validated have passed the walk-forward test. Compare `conservative` (fails OOS, high 5yr return) against `regime_filtered` (passes OOS, strong 10yr metrics). This difference illustrates the most important concept in quantitative strategy development: **in-sample performance is not evidence of a real edge — only out-of-sample validation is.**

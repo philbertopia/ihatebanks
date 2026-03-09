@@ -95,8 +95,8 @@
     "status": "active",
     "champion": false,
     "universe_note": "Uses selected universe profile (default top_50) with stricter spread and unusual-flow thresholds",
-    "description": "Conservative intraday profile with tighter stop-loss and earlier trailing activation to improve consistency and win rate.",
-    "hypothesis": "Lower risk-per-trade and stricter quality gates should improve win-rate at the cost of capped upside."
+    "description": "Conservative intraday profile with tighter stop-loss and earlier trailing activation. 5-year IS: +2127%, Sharpe 3.48, Max DD 10.1%. 10-year: +594%, Sharpe 0.67, Max DD 39.1%. Fails OOS walk-forward (Sharpe -1.08) — the edge concentrates in high-vol regimes (2020-2021, 2025) and disappears in low-vol years (2015-2019, 2024). See regime_filtered for the OOS-validated version.",
+    "hypothesis": "Lower risk-per-trade and stricter quality gates improve win-rate. However, the edge is regime-dependent — it only persists when VIX and intraday volatility are elevated. Without a regime gate, low-vol periods produce flat/negative returns that drag long-run Sharpe below validation thresholds."
   },
   {
     "strategy_id": "intraday_open_close_options",
@@ -125,7 +125,7 @@
     "status": "experimental",
     "champion": false,
     "universe_note": "Uses selected universe profile (default top_50) with the conservative baseline plus light regime alignment",
-    "description": "Conservative baseline plus symbol regime alignment only. Keeps modeled data allowed and sizing unchanged so the test isolates whether light trend filtering improves stability without starving trade count.",
+    "description": "Conservative baseline plus symbol regime alignment only. 10-year result: +905%, Sharpe 1.25, Max DD 21.3%, 2119 trades. Regime gate alone (without raised thresholds) improves Sharpe from 0.67 to 1.25 and cuts max drawdown from 39% to 21% — confirming regime alignment as the primary driver of the improvement.",
     "hypothesis": "A light regime gate should remove the worst countertrend entries while preserving enough trades to keep the edge measurable."
   },
   {
@@ -135,7 +135,7 @@
     "status": "experimental",
     "champion": false,
     "universe_note": "Uses selected universe profile (default top_50) with conservative baseline thresholds plus historical edge confirmation",
-    "description": "Conservative baseline plus a minimum 55% historical bucket win rate with at least 6 observations. Tests whether similarity-confirmed setups improve selectivity without the zero-trade problem of the hardened variants.",
+    "description": "Conservative baseline plus a minimum 55% historical bucket win rate with at least 6 observations. 10-year result: +1458%, Sharpe 1.23, Max DD 36.4%, 2777 trades. Higher return than regime_filtered but at the cost of elevated drawdown — the win-rate gate captures more upside but doesn't protect against low-vol regime drag the way a regime gate does.",
     "hypothesis": "Requiring a modest historical edge floor should filter weak pattern matches and improve consistency."
   },
   {
@@ -145,8 +145,19 @@
     "status": "experimental",
     "champion": false,
     "universe_note": "Uses selected universe profile (default top_50) with tighter spread, liquidity, and unusual-flow scanning criteria",
-    "description": "Conservative baseline with tighter scan-quality thresholds and slightly smaller per-trade sizing. Focuses on execution quality instead of hard walk-forward exclusions.",
+    "description": "Conservative baseline with tighter scan-quality thresholds and slightly smaller per-trade sizing. 10-year result: +1015%, Sharpe 1.10, Max DD 26.9%, 2617 trades. Tighter quality gates improve returns over the plain conservative but don't address regime drag as effectively as a dedicated regime alignment filter.",
     "hypothesis": "Better scan quality and a small sizing trim should improve drawdown stability more efficiently than the zero-trade hardened profiles."
+  },
+  {
+    "strategy_id": "intraday_open_close_options",
+    "strategy_name": "Intraday Open-Close Options",
+    "variant": "regime_filtered",
+    "status": "active",
+    "validated": true,
+    "champion": false,
+    "universe_note": "Uses selected universe profile (default top_50). Regime gate skips low-vol environments — roughly 40% of days are bypassed, keeping only high-quality setups.",
+    "description": "Conservative intraday profile with a volatility regime gate added. Trades only when intraday conditions meet regime alignment criteria. 10-year result: +909%, Sharpe 1.80, Max DD 8.1%, 1109 trades. OOS walk-forward: Sharpe 1.56, +36.7% avg return per window, Max DD 6.4% — PASSES validation across 15 windows.",
+    "hypothesis": "The conservative variant's edge concentrates in high-vol regimes. Requiring regime alignment before entry cuts 60% of trades but keeps only the profitable subset — boosting Sharpe from 0.67 to 1.80, cutting max drawdown from 39% to 8%, and flipping OOS Sharpe from -1.08 (fail) to +1.56 (pass)."
   },
   {
     "strategy_id": "intraday_open_close_options",
