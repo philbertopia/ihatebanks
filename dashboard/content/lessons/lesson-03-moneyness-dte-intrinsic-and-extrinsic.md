@@ -132,6 +132,8 @@ Systematic premium sellers target **30-60 DTE** because:
 
 The strategies on this site target monthly expirations (the third Friday of each month), which typically places entries in the 30-50 DTE range.
 
+This is where many beginner leverage examples go wrong: they focus on the upside payout but skip over how fast extrinsic value decays when the clock gets short. [How long-call leverage really works](/education/articles/how-long-call-leverage-really-works) walks through that tradeoff with a corrected one-month call example.
+
 ---
 
 ## Putting it together: why OTM options in the 30-60 DTE window
@@ -147,5 +149,7 @@ This is not coincidental. Every strategy on this site was designed around these 
 ---
 
 ## Apply it
+
+For the opposite side of that tradeoff, read [How long-call leverage really works](/education/articles/how-long-call-leverage-really-works) and note how a short-dated long call needs both price movement and enough time left for that movement to matter.
 
 Open the [Backtest Explorer](/backtest) and look at a Put Credit Spread run. Find the average DTE at entry. Now look at the win rate — the percentage of trades where the short put expired out of the money. Notice that the strategy profits from the stock simply *not falling to the strike* — the intrinsic value stays at zero, and the full extrinsic value the seller collected at entry decays into profit.

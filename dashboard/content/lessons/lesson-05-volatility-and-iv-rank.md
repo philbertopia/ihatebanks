@@ -113,6 +113,26 @@ Premium sellers want to sell when options are expensive. Selling into low IV is 
 
 ---
 
+## IV Rank vs. IV Percentile
+
+You may also see a metric called **IV Percentile (IVP)**. While it sounds similar to IV Rank, it measures something different and the distinction is important.
+
+- **IV Rank** tells you where the current IV is relative to its **highest and lowest points** over the last year.
+- **IV Percentile** tells you the **percentage of days** in the last year that IV was **lower than the current IV**.
+
+**Example where they differ:**
+Imagine a stock's IV over the past year has been between 10% and 100%.
+- For 11 months, IV was pinned between 10% and 20%.
+- Last month, there was a huge spike to 100%, and now it has settled back to 25%.
+
+- **IV Rank:** `(25 - 10) / (100 - 10) = 15 / 90 = 16.7`. The IV Rank is very low because the current IV of 25% is much closer to the 1-year low (10%) than the high (100%).
+- **IV Percentile:** Since IV spent 11 months below 20%, the current IV of 25% is higher than it was on most days of the year. The IV Percentile might be **90% or higher**.
+
+**Which one is better?**
+Most systematic premium sellers prefer **IV Rank**. It does a better job of capturing whether volatility is "expensive" relative to recent extremes. The massive spike in the example created a new ceiling for what's possible, and IV Rank reflects that the current environment is calm *relative to that new reality*. IV Percentile can be misleading after a major volatility event, suggesting vol is high when it has actually just collapsed from a peak.
+
+---
+
 ## Mean reversion of volatility
 
 Volatility is mean-reverting. After spikes — earnings, macro events, market crashes — implied volatility tends to fall back toward its historical average.

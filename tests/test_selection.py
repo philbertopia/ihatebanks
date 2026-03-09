@@ -24,3 +24,13 @@ def test_select_ranked_entries_respects_max_positions():
     assert len(selected) == 2
     assert [x["underlying"] for x in selected] == ["AAPL", "MSFT"]
 
+
+def test_select_ranked_entries_prefers_setup_score_when_present():
+    candidates = [
+        {"underlying": "AAPL", "contract_symbol": "AAPL", "score": 90.0, "setup_score": 65.0},
+        {"underlying": "MSFT", "contract_symbol": "MSFT", "score": 70.0, "setup_score": 80.0},
+    ]
+
+    selected = select_ranked_entries(candidates, max_positions=2)
+
+    assert [x["underlying"] for x in selected] == ["MSFT", "AAPL"]

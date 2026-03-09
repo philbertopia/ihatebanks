@@ -59,6 +59,18 @@ def test_get_intraday_variant_known_and_unknown():
         get_intraday_variant("not_a_variant")
 
 
+def test_new_conservative_family_variants_are_registered():
+    regime = get_intraday_variant("conservative_regime_lite")
+    hist = get_intraday_variant("conservative_hist_55")
+    scan = get_intraday_variant("conservative_scan_quality")
+
+    assert regime.require_regime_alignment is True
+    assert hist.min_hist_win_rate == pytest.approx(55.0)
+    assert hist.min_hist_observations == 6
+    assert scan.min_liquidity_score > get_intraday_variant("conservative").min_liquidity_score
+    assert scan.max_spread_pct < get_intraday_variant("conservative").max_spread_pct
+
+
 def test_data_quality_score_penalty_ordering():
     v = get_intraday_variant("baseline")
     observed = data_quality_score_penalty("observed", v)

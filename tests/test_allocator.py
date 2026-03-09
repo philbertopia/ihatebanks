@@ -1,5 +1,8 @@
 from ovtlyr.strategy.allocator import (
+    PortfolioOverlayState,
     compute_regime_state,
+    evaluate_portfolio_overlay,
+    get_portfolio_overlay_config,
     risk_budget_for_regime,
     strategy_allowed,
 )
@@ -78,3 +81,80 @@ def test_risk_budget_for_regime_shapes():
     assert b_on["max_new_positions"] > b_off["max_new_positions"]
     assert b_on["allocation_mult"] > b_off["allocation_mult"]
 
+
+def test_portfolio_overlay_drawdown_throttle_and_resume():
+    config = get_portfolio_overlay_config("regime_core_drawdown")
+    state = PortfolioOverlayState(peak_equity=100_000.0)
+
+    state, decision = evaluate_portfolio_overlay(config, state, current_equity=94_500.0)
+    assert decision.allow_new_entries is True
+    assert decision.risk_scale == 0.5
+    assert decision.reason == "drawdown_throttle"
+
+    state, decision = evaluate_portfolio_overlay(config, state, current_equity=95_500.0)
+    assert decision.allow_new_entries is True
+    assert decision.risk_scale == 0.5
+    assert decision.reason == "drawdown_throttle"
+
+    state, decision = evaluate_portfolio_overlay(config, state, current_equity=96_500.0)
+    assert decision.allow_new_entries is True
+    assert decision.risk_scale == 1.0
+    assert decision.reason == "normal"
+
+
+def test_portfolio_overlay_hard_stop_precedence():
+    config = get_portfolio_overlay_config("regime_core_overlay")
+    state = PortfolioOverlayState(peak_equity=100_000.0)
+
+    state, decision = evaluate_portfolio_overlay(
+        config,
+        state,
+        current_equity=91_500.0,
+        hv20_percentile=99.0,
+    )
+    assert decision.allow_new_entries is False
+    assert decision.reason == "drawdown_hard_stop"
+    assert decision.drawdown_mode == "hard_stop"
+
+    state, decision = evaluate_portfolio_overlay(
+        config,
+        state,
+        current_equity=95_500.0,
+        hv20_percentile=60.0,
+    )
+    assert decision.allow_new_entries is False
+    assert decision.reason == "volatility_pause"
+    assert decision.drawdown_mode == "soft_throttle"
+
+
+def test_portfolio_overlay_killswitch_resumes_after_three_clear_days():
+    config = get_portfolio_overlay_config("regime_core_killswitch")
+    state = PortfolioOverlayState(peak_equity=100_000.0)
+
+    state, decision = evaluate_portfolio_overlay(
+        config,
+        state,
+        current_equity=100_000.0,
+        hv20_percentile=99.0,
+    )
+    assert decision.allow_new_entries is False
+    assert decision.reason == "volatility_pause"
+
+    for _ in range(2):
+        state, decision = evaluate_portfolio_overlay(
+            config,
+            state,
+            current_equity=100_000.0,
+            hv20_percentile=40.0,
+        )
+        assert decision.allow_new_entries is False
+        assert decision.reason == "volatility_pause"
+
+    state, decision = evaluate_portfolio_overlay(
+        config,
+        state,
+        current_equity=100_000.0,
+        hv20_percentile=40.0,
+    )
+    assert decision.allow_new_entries is True
+    assert decision.reason == "normal"

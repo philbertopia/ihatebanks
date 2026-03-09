@@ -133,7 +133,7 @@ The Put Credit Spread strategies on this site use these entry filters:
 
 **Profit target:** Close the spread when it reaches 50% of maximum profit ($67.50 on the example above). This exits at the steepest part of the decay curve and frees capital for the next trade.
 
-**Stop loss:** Close if the spread reaches 2x the premium received ($270 loss on the example). This prevents a routine losing trade from becoming a catastrophic one.
+**Stop loss:** Close if the spread price reaches 2x the premium received ($270 debit, resulting in a $135 loss). This prevents a routine losing trade from becoming a catastrophic one.
 
 **Time stop:** If neither target is hit by 21 DTE, consider closing regardless. The final 3 weeks carry elevated gamma risk.
 

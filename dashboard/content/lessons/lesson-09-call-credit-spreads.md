@@ -130,6 +130,8 @@ When you combine a put credit spread with a call credit spread on the same under
 
 Iron condors reduce directional exposure and collect premium from both sides. They require the market to stay calm, which makes them vulnerable to large moves in either direction.
 
+That does not automatically make them a beginner small-account strategy. A same-day iron condor can look cheap in buying-power terms while concentrating most of the account into one gamma-sensitive session. [Small-account options: capital efficiency versus real risk](/education/articles/small-account-options-capital-efficiency-vs-risk) explains why that distinction matters.
+
 ---
 
 ## Entry criteria for the backtested call credit spread

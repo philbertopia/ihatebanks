@@ -111,10 +111,17 @@ class BacktestDataCollector:
         logger.info(f"Cached {len(df)} contracts to {out_path}")
         return len(df)
 
-    def load_cached_data(self) -> pd.DataFrame:
-        """Load all Parquet files from the cache directory into a single DataFrame."""
+    def load_cached_data(
+        self, start: date | str | None = None, end: date | str | None = None
+    ) -> pd.DataFrame:
+        """Load cached Parquet files, optionally restricting by file-date range."""
         if not os.path.exists(CACHE_DIR):
             return pd.DataFrame()
+
+        if isinstance(start, str):
+            start = date.fromisoformat(start)
+        if isinstance(end, str):
+            end = date.fromisoformat(end)
 
         files = sorted(
             [f for f in os.listdir(CACHE_DIR) if f.endswith(".parquet")]
@@ -124,6 +131,15 @@ class BacktestDataCollector:
 
         dfs = []
         for fname in files:
+            stem = os.path.splitext(fname)[0]
+            try:
+                file_date = date.fromisoformat(stem)
+            except ValueError:
+                file_date = None
+            if start and file_date and file_date < start:
+                continue
+            if end and file_date and file_date > end:
+                continue
             path = os.path.join(CACHE_DIR, fname)
             try:
                 dfs.append(pd.read_parquet(path))

@@ -93,6 +93,23 @@ def _parse_ymd(value: str | None) -> date | None:
         return None
 
 
+def _normalize_initial_capital(value, default: float = 100_000.0) -> float:
+    try:
+        capital = float(value)
+    except (TypeError, ValueError):
+        capital = float(default)
+    if capital <= 0:
+        capital = float(default)
+    return round(capital, 2)
+
+
+def _capital_token(value) -> str:
+    capital = _normalize_initial_capital(value)
+    if capital.is_integer():
+        return str(int(capital))
+    return f"{capital:.2f}".replace(".", "p")
+
+
 def _period_span_days(run: dict) -> int:
     start = _parse_ymd(run.get("start_date"))
     end = _parse_ymd(run.get("end_date"))
@@ -208,7 +225,7 @@ def get_walkforward_runs():
 
 @router.get("/stats/backtest/strategies")
 def get_backtest_strategy_comparison():
-    """Aggregate runs by strategy+variant for side-by-side comparison."""
+    """Aggregate runs by strategy+variant+capital for side-by-side comparison."""
     runs = _load_json(BACKTEST_RUNS_PATH, [])
     if not isinstance(runs, list):
         runs = []
@@ -217,7 +234,7 @@ def get_backtest_strategy_comparison():
     for run in runs:
         strategy_id = run.get("strategy_id", "unknown")
         variant = run.get("variant", "base")
-        key = f"{strategy_id}|{variant}"
+        key = f"{strategy_id}|{variant}|cap{_capital_token(run.get('initial_capital'))}"
         grouped.setdefault(key, []).append(run)
 
     result = []
@@ -248,6 +265,7 @@ def get_backtest_strategy_comparison():
             "strategy_id": latest.get("strategy_id", "unknown"),
             "strategy_name": latest.get("strategy_name", latest.get("strategy_id", "unknown")),
             "variant": latest.get("variant", "base"),
+            "initial_capital": _normalize_initial_capital(latest.get("initial_capital")),
             "engine_type": latest.get("engine_type", ""),
             "assumptions_mode": latest.get("assumptions_mode", latest.get("variant", "")),
             "universe_profile": latest.get("universe_profile", ""),
@@ -286,7 +304,16 @@ def get_backtest_strategy_comparison():
             "has_component_metrics": any(bool(e.get("component_metrics")) for e in entries),
         })
 
-    return _json_safe(sorted(result, key=lambda r: (r["strategy_id"], r["variant"])))
+    return _json_safe(
+        sorted(
+            result,
+            key=lambda r: (
+                r["strategy_id"],
+                r["variant"],
+                _normalize_initial_capital(r.get("initial_capital")),
+            ),
+        )
+    )
 
 
 @router.get("/stats/backtest/catalog")

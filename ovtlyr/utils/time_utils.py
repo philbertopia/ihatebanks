@@ -31,6 +31,20 @@ def get_monthly_expirations(min_dte: int, max_dte: int, today: date = None) -> L
     return sorted(expirations)
 
 
+def get_weekly_expirations(min_dte: int, max_dte: int, today: date = None) -> List[date]:
+    """Return all Fridays (not just 3rd Friday) whose DTE falls within [min_dte, max_dte]."""
+    if today is None:
+        today = date.today()
+    expirations: List[date] = []
+    for offset in range(max_dte + 14):
+        candidate = today + timedelta(days=offset)
+        if candidate.weekday() == 4:  # Friday
+            dte = (candidate - today).days
+            if min_dte <= dte <= max_dte:
+                expirations.append(candidate)
+    return sorted(set(expirations))
+
+
 def is_final_week(expiration_date: date, today: date = None) -> bool:
     """Return True if the expiration is 7 or fewer calendar days away."""
     if today is None:

@@ -81,7 +81,7 @@ class BacktestEngine:
         self.positions: List[Dict] = []
         self.closed_trades: List[Dict] = []
         self.equity_curve: List[float] = []
-        self.initial_capital = 100_000.0
+        self.initial_capital = self._resolve_initial_capital(config)
         # Precomputed EMA trend states: {symbol: {date_str: {is_bullish, is_bearish}}}
         self._trend_states: Dict[str, Dict[str, Dict]] = {}
         # VIX proxy: SPY 30-day historical volatility, keyed by date_str
@@ -99,6 +99,31 @@ class BacktestEngine:
         self._iv_ranks: Dict[
             str, Dict[str, float]
         ] = {}  # {date_str: {symbol: iv_rank_pct}}
+        # RSI(14) per symbol per day: {symbol: {date_str: rsi_value (0-100)}}
+        self._rsi: Dict[str, Dict[str, float]] = {}
+        # 5-day prior rolling high per symbol: {symbol: {date_str: high_price}}
+        # shift(1) ensures today's bar is excluded — used for breakout gate
+        self._5d_high: Dict[str, Dict[str, float]] = {}
+        # Daily close-to-close return per symbol: {symbol: {date_str: gap_pct}}
+        # Positive = gap up, negative = gap down. Used for gap momentum entry gate.
+        self._gap_signals: Dict[str, Dict[str, float]] = {}
+        # Lagged close-to-close ATR proxy per symbol/date.
+        self._atr_proxy: Dict[str, Dict[str, float]] = {}
+
+    def _resolve_initial_capital(self, config: Dict[str, Any]) -> float:
+        backtest_cfg = config.get("backtest", {}) if isinstance(config, dict) else {}
+        raw = (
+            backtest_cfg.get("initial_capital")
+            if isinstance(backtest_cfg, dict)
+            else None
+        )
+        if raw is None:
+            raw = self.strategy.get("initial_capital")
+        try:
+            capital = float(raw)
+        except (TypeError, ValueError):
+            capital = 100_000.0
+        return capital if capital > 0 else 100_000.0
 
     def _precompute_trend_states(
         self,
@@ -219,6 +244,38 @@ class BacktestEngine:
             len(self._nd_high),
         )
 
+    def _precompute_atr_proxy(self, window: int = 14) -> None:
+        """
+        Precompute a lagged ATR proxy from close-to-close absolute moves because
+        the historical cache does not carry OHLC bars.
+        """
+        self._atr_proxy = {}
+        if "underlying_price" not in self.data.columns:
+            return
+
+        price_df = (
+            self.data[["date", "underlying", "underlying_price"]]
+            .drop_duplicates(subset=["date", "underlying"])
+            .sort_values("date")
+        )
+
+        for sym, grp in price_df.groupby("underlying"):
+            grp = grp.sort_values("date").copy()
+            prices = grp["underlying_price"].astype(float)
+            abs_moves = prices.diff().abs()
+            atr_proxy = abs_moves.rolling(window, min_periods=1).mean().shift(1)
+            self._atr_proxy[str(sym)] = {
+                str(row["date"]): float(v)
+                for (_, row), v in zip(grp.iterrows(), atr_proxy)
+                if pd.notna(v)
+            }
+
+        logger.info(
+            "[BT] ATR proxy computed for %d symbols (window=%d)",
+            len(self._atr_proxy),
+            window,
+        )
+
     def _precompute_momentum_ranks(self, lookback_days: int = 90) -> None:
         """
         Precompute per-day momentum rank percentile for each symbol.
@@ -314,6 +371,102 @@ class BacktestEngine:
             lookback_days,
         )
 
+    def _precompute_rsi(self, period: int = 14) -> None:
+        """
+        Precompute RSI(period) per symbol per day using Wilder's EWM smoothing.
+        Stored in self._rsi[symbol][date_str] = rsi_value (0-100).
+        """
+        if "underlying_price" not in self.data.columns:
+            return
+
+        price_df = (
+            self.data[["date", "underlying", "underlying_price"]]
+            .drop_duplicates(subset=["date", "underlying"])
+            .sort_values("date")
+        )
+
+        for symbol, grp in price_df.groupby("underlying"):
+            grp = grp.sort_values("date").copy()
+            prices = grp["underlying_price"].astype(float)
+            delta = prices.diff()
+            gains = delta.clip(lower=0).ewm(alpha=1.0 / period, adjust=False).mean()
+            losses = (-delta.clip(upper=0)).ewm(alpha=1.0 / period, adjust=False).mean()
+            rs = gains / (losses + 1e-9)
+            rsi = 100.0 - (100.0 / (1.0 + rs))
+            self._rsi[str(symbol)] = {
+                str(row["date"]): float(rsi_val)
+                for (_, row), rsi_val in zip(grp.iterrows(), rsi)
+                if pd.notna(rsi_val)
+            }
+
+        logger.info(
+            "[BT] RSI(%d) precomputed for %d symbols",
+            period,
+            len(self._rsi),
+        )
+
+    def _precompute_5d_high(self, lookback: int = 5) -> None:
+        """
+        Precompute 5-day prior rolling high per symbol.
+        Uses shift(1) so today's bar is excluded — result is the max of the
+        previous `lookback` trading days. Used for momentum breakout gate.
+        Stored in self._5d_high[symbol][date_str] = prior_high.
+        """
+        if "underlying_price" not in self.data.columns:
+            return
+
+        price_df = (
+            self.data[["date", "underlying", "underlying_price"]]
+            .drop_duplicates(subset=["date", "underlying"])
+            .sort_values("date")
+        )
+
+        for symbol, grp in price_df.groupby("underlying"):
+            grp = grp.sort_values("date").copy()
+            prices = grp["underlying_price"].astype(float)
+            # shift(1) excludes today; min_periods=lookback requires full window
+            prior_high = prices.shift(1).rolling(lookback, min_periods=lookback).max()
+            self._5d_high[str(symbol)] = {
+                str(row["date"]): float(ph)
+                for (_, row), ph in zip(grp.iterrows(), prior_high)
+                if pd.notna(ph)
+            }
+
+        logger.info(
+            "[BT] 5-day prior rolling highs precomputed for %d symbols",
+            len(self._5d_high),
+        )
+
+    def _precompute_gap_signals(self) -> None:
+        """
+        Precompute daily close-to-close return per symbol.
+        gap_pct[d] = (close[d] / close[d-1]) - 1
+        Stored in self._gap_signals[symbol][date_str] as a decimal (0.015 = 1.5% move up).
+        """
+        if "underlying_price" not in self.data.columns:
+            return
+
+        price_df = (
+            self.data[["date", "underlying", "underlying_price"]]
+            .drop_duplicates(subset=["date", "underlying"])
+            .sort_values("date")
+        )
+
+        for symbol, grp in price_df.groupby("underlying"):
+            grp = grp.sort_values("date").copy()
+            prices = grp["underlying_price"].astype(float)
+            gap = prices.pct_change()
+            self._gap_signals[str(symbol)] = {
+                str(row["date"]): float(gap.iloc[i])
+                for i, (_, row) in enumerate(grp.iterrows())
+                if pd.notna(gap.iloc[i])
+            }
+
+        logger.info(
+            "[BT] Gap signals (close-to-close returns) precomputed for %d symbols",
+            len(self._gap_signals),
+        )
+
     def _build_correlation_frame(
         self, lookback_days: int = 90
     ) -> Dict[str, Dict[str, float]]:
@@ -357,6 +510,128 @@ class BacktestEngine:
             return False
         return bool(state.get("is_bearish", False))
 
+    def _price_band_allows_underlying(self, underlying_price: float) -> bool:
+        min_price = float(self.strategy.get("min_underlying_price", 0.0) or 0.0)
+        max_price = float(self.strategy.get("max_underlying_price", 0.0) or 0.0)
+        if min_price > 0.0 and underlying_price < min_price:
+            return False
+        if max_price > 0.0 and underlying_price > max_price:
+            return False
+        return True
+
+    def _quote_long_exit(
+        self, pos: Dict[str, Any], settings: Dict[str, Any]
+    ) -> Dict[str, float]:
+        qty = int(pos.get("qty", 1))
+        bid_px = float(pos.get("current_bid", pos["entry_price"] * 0.99))
+        ask_px = float(
+            pos.get("current_ask", pos.get("current_price", pos["entry_price"]))
+        )
+        spread_abs = max(ask_px - bid_px, 0.01)
+        fill = adjust_fill_price(
+            price=bid_px,
+            spread_abs=spread_abs,
+            side="sell",
+            tod_bucket="close",
+            settings=settings,
+            data_quality="mixed",
+        )
+        return {
+            "bid_px": bid_px,
+            "ask_px": ask_px,
+            "spread_abs": spread_abs,
+            "fill": fill,
+            "slippage_bps": expected_slippage_bps(
+                spread_pct=spread_abs / max(fill, 1e-6),
+                tod_bucket="close",
+                settings=settings,
+                data_quality="mixed",
+            ),
+            "spread_cost": spread_abs * qty * 100.0,
+            "slippage_cost": max(bid_px - fill, 0.0) * qty * 100.0,
+            "proceeds": fill * qty * 100.0,
+            "realized": (fill - float(pos["entry_price"])) * qty * 100.0,
+        }
+
+    def _quote_long_entry(
+        self, candidate: Dict[str, Any], qty: int, settings: Dict[str, Any]
+    ) -> Dict[str, float]:
+        ask_px = float(candidate["ask"])
+        bid_px = float(candidate.get("bid", max(ask_px - 0.05, 0.01)))
+        spread_abs = max(ask_px - bid_px, 0.01)
+        fill = adjust_fill_price(
+            price=ask_px,
+            spread_abs=spread_abs,
+            side="buy",
+            tod_bucket="open",
+            settings=settings,
+            data_quality="mixed",
+        )
+        return {
+            "ask_px": ask_px,
+            "bid_px": bid_px,
+            "spread_abs": spread_abs,
+            "fill": fill,
+            "slippage_bps": expected_slippage_bps(
+                spread_pct=spread_abs / max(fill, 1e-6),
+                tod_bucket="open",
+                settings=settings,
+                data_quality="mixed",
+            ),
+            "spread_cost": spread_abs * qty * 100.0,
+            "slippage_cost": max(fill - ask_px, 0.0) * qty * 100.0,
+            "cost": fill * qty * 100.0,
+        }
+
+    def _build_long_position(
+        self,
+        candidate: Dict[str, Any],
+        qty: int,
+        entry_fill: float,
+        entry_bid: float,
+        entry_ask: float,
+        today: date,
+        strategy_type: str,
+        stop_loss_pct: float,
+    ) -> Dict[str, Any]:
+        underlying_price = float(candidate.get("underlying_price", 0.0) or 0.0)
+        return {
+            **candidate,
+            "qty": qty,
+            "entry_price": entry_fill,
+            "entry_date": today.isoformat(),
+            "current_price": entry_fill,
+            "current_bid": entry_bid,
+            "current_ask": entry_ask,
+            "current_underlying_price": underlying_price,
+            "stop_loss_pct": stop_loss_pct if stop_loss_pct > 0 else 0.20,
+            "strategy_type": strategy_type,
+            "roll_anchor_underlying_price": underlying_price,
+            "roll_anchor_date": today.isoformat(),
+        }
+
+    def _should_attempt_atr_roll(self, pos: Dict[str, Any], day_str: str) -> bool:
+        if not bool(self.strategy.get("atr_roll_enabled", False)):
+            return False
+        if pos.get("strategy_type") == "swing_call":
+            return False
+        if pos.get("strategy_type") == "csp" or "entry_credit" in pos:
+            return False
+
+        anchor_price = pos.get("roll_anchor_underlying_price")
+        current_price = pos.get("current_underlying_price")
+        if anchor_price is None or current_price is None:
+            return False
+
+        atr_value = self._atr_proxy.get(str(pos.get("underlying", "")), {}).get(day_str)
+        if atr_value is None or atr_value <= 0.0:
+            return False
+
+        atr_multiple = float(self.strategy.get("atr_roll_multiple", 1.0) or 1.0)
+        return float(current_price) >= float(anchor_price) + atr_multiple * float(
+            atr_value
+        )
+
     def run(self, start_date, end_date) -> Dict:
         """Simulate the strategy over the date range in the cached data."""
         # Normalize date types
@@ -364,6 +639,10 @@ class BacktestEngine:
             start_date = date.fromisoformat(start_date)
         if isinstance(end_date, str):
             end_date = date.fromisoformat(end_date)
+
+        self.positions = []
+        self.closed_trades = []
+        self.equity_curve = []
 
         # Read trend-gate config
         require_symbol_trend = self.strategy.get("require_symbol_bullish_trend", False)
@@ -411,6 +690,20 @@ class BacktestEngine:
         strategy_type = self.strategy.get("strategy_type", "stock_replacement")
         is_csp = strategy_type == "csp"
         is_wheel = strategy_type == "wheel"
+        is_swing = strategy_type == "swing_call"
+
+        # Swing call config (only read when is_swing; safe to parse regardless)
+        swing_rsi_enabled = bool(self.strategy.get("swing_rsi_enabled", False))
+        swing_rsi_period = int(self.strategy.get("swing_rsi_period", 14))
+        swing_rsi_max = float(self.strategy.get("swing_rsi_entry_max", 35.0))
+        swing_breakout_enabled = bool(self.strategy.get("swing_momentum_breakout_enabled", False))
+        swing_breakout_days = int(self.strategy.get("swing_breakout_lookback_days", 5))
+        swing_profit_target_pct = float(self.strategy.get("swing_profit_target_pct", 35.0))
+        swing_stop_loss_pct = float(self.strategy.get("swing_stop_loss_pct", 20.0))
+        swing_max_hold_days = int(self.strategy.get("swing_max_hold_days", 3))
+        swing_gap_enabled = bool(self.strategy.get("swing_gap_enabled", False))
+        swing_gap_min_pct = float(self.strategy.get("swing_gap_min_pct", 1.5)) / 100.0
+        swing_gap_direction = str(self.strategy.get("swing_gap_direction", "up")).lower()
         wheel_call_delta = self.strategy.get("wheel_call_delta", 0.30)
         self.stock_positions = []
 
@@ -436,6 +729,10 @@ class BacktestEngine:
         )
         max_symbol_notional_pct = float(risk_cfg.get("max_symbol_notional_pct", 0.20))
         max_contracts_per_trade = int(self.strategy.get("max_contracts_per_trade", 3))
+        max_contract_cost = float(self.strategy.get("max_contract_cost", 0.0) or 0.0)
+        atr_roll_enabled = bool(self.strategy.get("atr_roll_enabled", False))
+        atr_roll_credit_only = bool(self.strategy.get("atr_roll_credit_only", True))
+        atr_window = int(self.strategy.get("atr_window", 14))
         macro_events = load_macro_calendar("config/macro_calendar.yaml")
         kill_state: Dict[str, Any] = {}
         corr_frame = self._build_correlation_frame(
@@ -464,7 +761,8 @@ class BacktestEngine:
         }
 
         # Precompute trend states if any EMA gate is active
-        if require_symbol_trend or sit_in_cash or sector_gate or exit_on_bearish_cross:
+        # Also precompute for swing — needed so the regime allocator sees bullish/bearish correctly
+        if require_symbol_trend or sit_in_cash or sector_gate or exit_on_bearish_cross or is_swing:
             logger.info("[BT] Precomputing EMA trend states...")
             self._precompute_trend_states(ema_fast, ema_medium, ema_slow)
 
@@ -472,6 +770,10 @@ class BacktestEngine:
         if vix_gate or breadth_gate or ob_gate:
             logger.info("[BT] Precomputing VIX proxy / breadth / order-block states...")
             self._precompute_signal_states(market_symbol, 200, ob_lookback)
+
+        if atr_roll_enabled and not is_csp:
+            logger.info("[BT] Precomputing ATR proxy (window=%d)...", atr_window)
+            self._precompute_atr_proxy(atr_window)
 
         # Precompute momentum ranks if momentum or RS filter is active
         if momentum_filter or rs_gate:
@@ -483,12 +785,26 @@ class BacktestEngine:
             logger.info("[BT] Precomputing IV ranks...")
             self._precompute_iv_rank(iv_rank_lookback)
 
-        trading_days = sorted(self.data["date"].unique())
-        trading_days = [
-            d
-            for d in trading_days
-            if start_date <= date.fromisoformat(str(d)) <= end_date
-        ]
+        # Precompute swing-specific indicators
+        if is_swing and swing_rsi_enabled:
+            logger.info("[BT] Precomputing RSI(%d) for swing entry gate...", swing_rsi_period)
+            self._precompute_rsi(swing_rsi_period)
+        if is_swing and swing_breakout_enabled:
+            logger.info(
+                "[BT] Precomputing %d-day prior highs for swing breakout gate...",
+                swing_breakout_days,
+            )
+            self._precompute_5d_high(swing_breakout_days)
+        if is_swing and swing_gap_enabled:
+            logger.info("[BT] Precomputing gap signals for gap momentum entry gate...")
+            self._precompute_gap_signals()
+
+        start_key = start_date.isoformat()
+        end_key = end_date.isoformat()
+        period_mask = (self.data["date"] >= start_key) & (self.data["date"] <= end_key)
+        period_data = self.data.loc[period_mask]
+        trading_days = sorted(period_data["date"].unique())
+        day_groups = {str(day): grp for day, grp in period_data.groupby("date", sort=False)}
 
         cash = self.initial_capital
         self.equity_curve = [cash]
@@ -500,7 +816,9 @@ class BacktestEngine:
 
         for day_str in trading_days:
             today = date.fromisoformat(str(day_str))
-            day_data = self.data[self.data["date"] == day_str]
+            day_data = day_groups.get(str(day_str))
+            if day_data is None or day_data.empty:
+                continue
 
             # 1. Update existing positions with current prices
             self._update_positions(day_data, today)
@@ -558,6 +876,58 @@ class BacktestEngine:
                     self.closed_trades.append(pos)
                     logger.debug(
                         f"[BT] Plan M exit ({reason}) {pos['contract_symbol']} @ {close_price:.2f} pnl=${realized:.2f}"
+                    )
+
+            # Swing call exits: profit target, stop loss, time (max hold days)
+            if is_swing:
+                swing_to_close = []
+                for pos in list(self.positions):
+                    reason = self._check_swing_exits(
+                        pos,
+                        today,
+                        swing_profit_target_pct,
+                        swing_stop_loss_pct,
+                        swing_max_hold_days,
+                    )
+                    if reason:
+                        swing_to_close.append((pos, reason))
+
+                for pos, reason in swing_to_close:
+                    self.positions.remove(pos)
+                    bid_px = float(
+                        pos.get("current_bid", pos.get("current_price", pos["entry_price"]) * 0.99)
+                    )
+                    ask_px = float(pos.get("current_ask", pos.get("current_price", pos["entry_price"])))
+                    spread_abs = max(ask_px - bid_px, 0.01)
+                    close_price = adjust_fill_price(
+                        price=bid_px,
+                        spread_abs=spread_abs,
+                        side="sell",
+                        tod_bucket="close",
+                        settings=exec_settings,
+                        data_quality="mixed",
+                    )
+                    slippage_bps.append(
+                        expected_slippage_bps(
+                            spread_pct=spread_abs / max(close_price, 1e-6),
+                            tod_bucket="close",
+                            settings=exec_settings,
+                            data_quality="mixed",
+                        )
+                    )
+                    spread_cost_total += spread_abs * pos["qty"] * 100.0
+                    slippage_cost_total += max(bid_px - close_price, 0.0) * pos["qty"] * 100.0
+                    proceeds = close_price * pos["qty"] * 100
+                    cash += proceeds
+                    realized = (close_price - pos["entry_price"]) * pos["qty"] * 100
+                    pos["close_date"] = today.isoformat()
+                    pos["close_price"] = close_price
+                    pos["realized_pnl"] = realized
+                    pos["exit_reason"] = reason
+                    self.closed_trades.append(pos)
+                    logger.debug(
+                        "[BT] Swing exit (%s) %s @ %.2f pnl=$%.2f",
+                        reason, pos["contract_symbol"], close_price, realized,
                     )
 
             # CSP profit target exits
@@ -658,6 +1028,75 @@ class BacktestEngine:
                 market_regime_blocked = True
                 kill_switch_block_days += 1
 
+            if atr_roll_enabled and not is_csp:
+                for pos in list(self.positions):
+                    if pos not in self.positions:
+                        continue
+                    if not self._should_attempt_atr_roll(pos, day_str):
+                        continue
+                    sym_ok = (not require_symbol_trend) or self._symbol_is_bullish(
+                        str(pos.get("underlying", "")), day_str
+                    )
+                    if not sym_ok or market_regime_blocked:
+                        continue
+
+                    replacement = self._find_replacement(
+                        day_data,
+                        str(pos.get("underlying", "")),
+                        today,
+                        exclude_contract_symbol=str(pos.get("contract_symbol", "")),
+                    )
+                    if replacement is None:
+                        continue
+
+                    exit_quote = self._quote_long_exit(pos, exec_settings)
+                    entry_quote = self._quote_long_entry(
+                        replacement, int(pos.get("qty", 1)), exec_settings
+                    )
+                    net_credit = exit_quote["proceeds"] - entry_quote["cost"]
+                    if atr_roll_credit_only and net_credit <= 0.0:
+                        continue
+
+                    self.positions.remove(pos)
+                    slippage_bps.append(exit_quote["slippage_bps"])
+                    spread_cost_total += exit_quote["spread_cost"]
+                    slippage_cost_total += exit_quote["slippage_cost"]
+                    cash += exit_quote["proceeds"]
+                    pos["close_date"] = today.isoformat()
+                    pos["close_price"] = exit_quote["fill"]
+                    pos["realized_pnl"] = exit_quote["realized"]
+                    pos["exit_reason"] = "roll_atr_credit"
+                    self.closed_trades.append(pos)
+                    rolls_count += 1
+                    logger.debug(
+                        "[BT] ATR roll %s -> %s net_credit=$%.2f",
+                        pos["contract_symbol"],
+                        replacement["contract_symbol"],
+                        net_credit,
+                    )
+
+                    fills_attempted += 1
+                    if cash >= entry_quote["cost"]:
+                        fills_completed += 1
+                        slippage_bps.append(entry_quote["slippage_bps"])
+                        spread_cost_total += entry_quote["spread_cost"]
+                        slippage_cost_total += entry_quote["slippage_cost"]
+                        cash -= entry_quote["cost"]
+                        self.positions.append(
+                            self._build_long_position(
+                                candidate=replacement,
+                                qty=int(pos.get("qty", 1)),
+                                entry_fill=entry_quote["fill"],
+                                entry_bid=entry_quote["bid_px"],
+                                entry_ask=entry_quote["ask_px"],
+                                today=today,
+                                strategy_type=str(
+                                    pos.get("strategy_type", strategy_type)
+                                ),
+                                stop_loss_pct=stop_loss_pct,
+                            )
+                        )
+
             # 3. Check roll conditions
             to_roll = [p for p in self.positions if self._needs_roll(p, today)]
             for pos in to_roll:
@@ -697,33 +1136,17 @@ class BacktestEngine:
                     )
                     close_price = buy_back
                 else:
-                    # Sell long call at bid
-                    bid_px = float(pos.get("current_bid", pos["entry_price"] * 0.99))
-                    ask_px = float(pos.get("current_ask", pos.get("current_price", pos["entry_price"])))
-                    spread_abs = max(ask_px - bid_px, 0.01)
-                    close_price = adjust_fill_price(
-                        price=bid_px,
-                        spread_abs=spread_abs,
-                        side="sell",
-                        tod_bucket="close",
-                        settings=exec_settings,
-                        data_quality="mixed",
-                    )
-                    slippage_bps.append(
-                        expected_slippage_bps(
-                            spread_pct=spread_abs / max(close_price, 1e-6),
-                            tod_bucket="close",
-                            settings=exec_settings,
-                            data_quality="mixed",
-                        )
-                    )
-                    spread_cost_total += spread_abs * pos["qty"] * 100.0
-                    slippage_cost_total += max(bid_px - close_price, 0.0) * pos["qty"] * 100.0
-                    cash += close_price * pos["qty"] * 100
-                    realized = (close_price - pos["entry_price"]) * pos["qty"] * 100
+                    exit_quote = self._quote_long_exit(pos, exec_settings)
+                    close_price = exit_quote["fill"]
+                    slippage_bps.append(exit_quote["slippage_bps"])
+                    spread_cost_total += exit_quote["spread_cost"]
+                    slippage_cost_total += exit_quote["slippage_cost"]
+                    cash += exit_quote["proceeds"]
+                    realized = exit_quote["realized"]
                 pos["close_date"] = today.isoformat()
                 pos["close_price"] = close_price
                 pos["realized_pnl"] = realized
+                pos["exit_reason"] = "roll"
                 self.closed_trades.append(pos)
                 rolls_count += 1
                 logger.debug(
@@ -736,7 +1159,10 @@ class BacktestEngine:
                 )
                 if sym_ok and not market_regime_blocked:
                     replacement = self._find_replacement(
-                        day_data, pos["underlying"], today
+                        day_data,
+                        pos["underlying"],
+                        today,
+                        exclude_contract_symbol=str(pos.get("contract_symbol", "")),
                     )
                     if replacement is not None:
                         if is_csp:
@@ -782,40 +1208,29 @@ class BacktestEngine:
                                 )
                         else:
                             fills_attempted += 1
-                            rep_ask = float(replacement["ask"])
-                            rep_bid = float(replacement.get("bid", max(rep_ask - 0.05, 0.01)))
-                            rep_spread = max(rep_ask - rep_bid, 0.01)
-                            rep_fill = adjust_fill_price(
-                                price=rep_ask,
-                                spread_abs=rep_spread,
-                                side="buy",
-                                tod_bucket="open",
-                                settings=exec_settings,
-                                data_quality="mixed",
+                            entry_quote = self._quote_long_entry(
+                                replacement, int(pos["qty"]), exec_settings
                             )
-                            slippage_bps.append(
-                                expected_slippage_bps(
-                                    spread_pct=rep_spread / max(rep_fill, 1e-6),
-                                    tod_bucket="open",
-                                    settings=exec_settings,
-                                    data_quality="mixed",
-                                )
-                            )
-                            spread_cost_total += rep_spread * pos["qty"] * 100.0
-                            slippage_cost_total += max(rep_fill - rep_ask, 0.0) * pos["qty"] * 100.0
-                            cost = rep_fill * pos["qty"] * 100
+                            cost = entry_quote["cost"]
                             if cash >= cost:
                                 fills_completed += 1
+                                slippage_bps.append(entry_quote["slippage_bps"])
+                                spread_cost_total += entry_quote["spread_cost"]
+                                slippage_cost_total += entry_quote["slippage_cost"]
                                 cash -= cost
                                 self.positions.append(
-                                    {
-                                        **replacement,
-                                        "qty": pos["qty"],
-                                        "entry_price": rep_fill,
-                                        "entry_date": today.isoformat(),
-                                        "current_price": rep_fill,
-                                        "current_bid": rep_bid,
-                                    }
+                                    self._build_long_position(
+                                        candidate=replacement,
+                                        qty=int(pos["qty"]),
+                                        entry_fill=entry_quote["fill"],
+                                        entry_bid=entry_quote["bid_px"],
+                                        entry_ask=entry_quote["ask_px"],
+                                        today=today,
+                                        strategy_type=str(
+                                            pos.get("strategy_type", strategy_type)
+                                        ),
+                                        stop_loss_pct=stop_loss_pct,
+                                    )
                                 )
 
             # 4. Market regime gate — sit in cash if any market-wide block is active
@@ -863,6 +1278,8 @@ class BacktestEngine:
                 underlying_price_pre = (
                     sym_data["underlying_price"].iloc[0] if not sym_data.empty else 0.0
                 )
+                if not self._price_band_allows_underlying(float(underlying_price_pre)):
+                    continue
 
                 # Order block gate: skip if price is within buffer_pct below N-day high (resistance zone)
                 if ob_gate:
@@ -900,6 +1317,30 @@ class BacktestEngine:
                     spy_ret = self._momentum_ranks.get(day_str, {}).get(rs_benchmark)
                     if sym_ret is None or spy_ret is None or sym_ret < spy_ret:
                         continue
+
+                # Swing entry gates — active only when strategy_type == "swing_call"
+                if is_swing:
+                    if swing_rsi_enabled:
+                        rsi_val = self._rsi.get(str(underlying), {}).get(day_str)
+                        if rsi_val is None or rsi_val >= swing_rsi_max:
+                            continue  # not in oversold bounce territory
+                    if swing_breakout_enabled:
+                        spot = (
+                            float(sym_data["underlying_price"].iloc[0])
+                            if not sym_data.empty
+                            else 0.0
+                        )
+                        prior_high = self._5d_high.get(str(underlying), {}).get(day_str, 0.0)
+                        if prior_high <= 0.0 or spot <= prior_high:
+                            continue  # no breakout above prior 5-day high
+                    if swing_gap_enabled:
+                        gap_val = self._gap_signals.get(str(underlying), {}).get(day_str)
+                        if gap_val is None:
+                            continue  # no prior close available
+                        if swing_gap_direction == "up" and gap_val < swing_gap_min_pct:
+                            continue  # gap up not large enough
+                        if swing_gap_direction == "down" and gap_val > -swing_gap_min_pct:
+                            continue  # gap down not large enough
 
                 corr_ok, _corr_info = correlation_gate(
                     candidate_symbol=str(underlying),
@@ -1016,6 +1457,8 @@ class BacktestEngine:
                         opened_today += 1
                 else:
                     fills_attempted += 1
+                    if max_contract_cost > 0.0 and (float(best["ask"]) * 100.0) > max_contract_cost:
+                        continue
                     est_vol = max(
                         float(best.get("implied_volatility", hv30_today or 0.20)), 0.05
                     )
@@ -1082,18 +1525,16 @@ class BacktestEngine:
                         fills_completed += 1
                         cash -= cost
                         self.positions.append(
-                            {
-                                **best,
-                                "qty": qty,
-                                "entry_price": entry_fill,
-                                "entry_date": today.isoformat(),
-                                "current_price": entry_fill,
-                                "current_bid": entry_bid,
-                                "current_ask": entry_ask,
-                                "stop_loss_pct": stop_loss_pct
-                                if stop_loss_pct > 0
-                                else 0.20,
-                            }
+                            self._build_long_position(
+                                candidate=best,
+                                qty=qty,
+                                entry_fill=entry_fill,
+                                entry_bid=entry_bid,
+                                entry_ask=entry_ask,
+                                today=today,
+                                strategy_type=str(strategy_type),
+                                stop_loss_pct=stop_loss_pct,
+                            )
                         )
                         seen_underlyings.add(underlying)
                         opened_today += 1
@@ -1329,6 +1770,41 @@ class BacktestEngine:
             return "bearish_cross"
         return None
 
+    def _check_swing_exits(
+        self,
+        pos: dict,
+        today: date,
+        profit_target_pct: float,
+        stop_loss_pct: float,
+        max_hold_days: int,
+    ) -> Optional[str]:
+        """Return exit reason for swing call positions. Three rules: PT, SL, max hold days.
+
+        The time exit is the key addition vs plan-M — swing trades are designed to
+        close within 1-3 days regardless of P&L because the signal thesis expires.
+        """
+        entry = float(pos.get("entry_price", 0))
+        if entry <= 0:
+            return None
+        current = float(pos.get("current_price", entry))
+        pnl_pct = (current - entry) / entry * 100.0
+
+        if profit_target_pct > 0 and pnl_pct >= profit_target_pct:
+            return "swing_profit_target"
+        if stop_loss_pct > 0 and pnl_pct <= -stop_loss_pct:
+            return "swing_stop_loss"
+
+        # Time exit: close after max_hold_days regardless of P&L
+        try:
+            entry_dt = date.fromisoformat(str(pos.get("entry_date", "")))
+            hold_days = (today - entry_dt).days
+            if hold_days >= max_hold_days:
+                return "swing_time_exit"
+        except (ValueError, TypeError):
+            pass
+
+        return None
+
     def _needs_roll(self, pos: Dict, today: date) -> bool:
         strategy_type = self.strategy.get("strategy_type", "stock_replacement")
 
@@ -1338,6 +1814,9 @@ class BacktestEngine:
             return self._needs_stock_replacement_roll(pos, today)
 
     def _needs_stock_replacement_roll(self, pos: Dict, today: date) -> bool:
+        # Swing positions exit via time/PT/SL only — never roll
+        if pos.get("strategy_type") == "swing_call":
+            return False
         min_delta = self.strategy.get("min_delta", 0.65)
         current_delta = (
             pos.get("current_delta") or pos.get("entry_delta") or pos.get("delta")
@@ -1419,15 +1898,33 @@ class BacktestEngine:
         return unrealized
 
     def _find_replacement(
-        self, day_data: pd.DataFrame, underlying: str, today: date
+        self,
+        day_data: pd.DataFrame,
+        underlying: str,
+        today: date,
+        exclude_contract_symbol: str = "",
     ) -> Optional[Dict]:
         sym_data = day_data[day_data["underlying"] == underlying]
         if sym_data.empty:
             return None
 
+        underlying_price = float(sym_data["underlying_price"].iloc[0])
+        if not self._price_band_allows_underlying(underlying_price):
+            return None
+
         chain = {
             row["contract_symbol"]: row.to_dict() for _, row in sym_data.iterrows()
         }
-        underlying_price = sym_data["underlying_price"].iloc[0]
         candidates = filter_candidates(chain, underlying_price, self.config, today)
-        return candidates[0] if candidates else None
+        max_contract_cost = float(self.strategy.get("max_contract_cost", 0.0) or 0.0)
+        for candidate in candidates:
+            if exclude_contract_symbol and str(candidate.get("contract_symbol", "")) == exclude_contract_symbol:
+                continue
+            if (
+                max_contract_cost > 0.0
+                and str(candidate.get("option_type", "call")).lower() == "call"
+                and float(candidate.get("ask", 0.0) or 0.0) * 100.0 > max_contract_cost
+            ):
+                continue
+            return candidate
+        return None

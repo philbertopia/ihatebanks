@@ -3,6 +3,14 @@ from typing import Any, Dict, Iterable, List, Optional
 from ovtlyr.strategy.risk_controls import correlation_gate
 
 
+def _selection_score(row: Dict[str, Any]) -> float:
+    value = row.get("setup_score", row.get("score", 0.0))
+    try:
+        return float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def select_ranked_entries(
     candidates: List[Dict[str, Any]],
     max_positions: int,
@@ -20,14 +28,14 @@ def select_ranked_entries(
         underlying = str(c.get("underlying") or "").strip().upper()
         if not underlying:
             continue
-        score = float(c.get("score", 0.0) or 0.0)
+        score = _selection_score(c)
         prev = best_by_underlying.get(underlying)
-        if prev is None or score > float(prev.get("score", 0.0) or 0.0):
+        if prev is None or score > _selection_score(prev):
             best_by_underlying[underlying] = c
 
     ranked_all = sorted(
         best_by_underlying.values(),
-        key=lambda x: float(x.get("score", 0.0) or 0.0),
+        key=_selection_score,
         reverse=True,
     )
 

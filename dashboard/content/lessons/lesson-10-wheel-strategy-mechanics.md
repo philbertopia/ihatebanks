@@ -89,7 +89,7 @@ If XYZ falls below $140 at expiration, the put is assigned — you buy 100 share
 
 `effective cost basis = strike price - total premiums collected`
 
-If you have run Phase 1 twice before assignment, collecting $2.50 each time:
+If you ran Phase 1 once before (expiring worthless), and then collected another $2.50 on the trade that got assigned:
 
 `effective cost basis = $140 - $2.50 - $2.50 = $135.00`
 

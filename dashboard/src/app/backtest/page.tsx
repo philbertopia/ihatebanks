@@ -10,6 +10,7 @@ import {
   useBacktestResults,
   useBacktestRuns,
   useBacktestStrategyComparison,
+  useCreditSpread10YResearch,
   useStrategyCatalog,
   useWalkforwardSummary,
 } from "@/lib/api";
@@ -38,6 +39,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 function strategyFamily(strategyId: string): string {
   if (strategyId.includes("openclaw_stock_options")) return "Stock Options";
   if (strategyId.includes("openclaw_put_credit_spread")) return "Put Credit Spread";
+  if (strategyId.includes("research_small_account_options")) return "Small Account Research";
   if (strategyId.includes("openclaw_tqqq_swing")) return "TQQQ Swing";
   if (strategyId.includes("openclaw_hybrid")) return "Hybrid";
   if (strategyId.includes("intraday_open_close_options")) return "Intraday O/C";
@@ -126,6 +128,28 @@ function pickRepresentativeRun(runs: BacktestRun[]): BacktestRun | undefined {
   });
 }
 
+function normalizedCapital(value: number | null | undefined): number {
+  return value != null && Number.isFinite(value) ? value : 100000;
+}
+
+function capitalKey(value: number | null | undefined): string {
+  const capital = normalizedCapital(value);
+  return Number.isInteger(capital) ? String(capital) : capital.toFixed(2);
+}
+
+function capitalMatches(rowCapital: number | null | undefined, targetCapital: number | null | undefined): boolean {
+  return Math.abs(normalizedCapital(rowCapital) - normalizedCapital(targetCapital)) < 0.005;
+}
+
+function capitalLabel(value: number | null | undefined): string | null {
+  const capital = normalizedCapital(value);
+  if (Math.abs(capital - 100000) < 0.005) return null;
+  return `Cap $${capital.toLocaleString("en-US", {
+    minimumFractionDigits: Number.isInteger(capital) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 function sanitizeDrawdown(value: unknown): number | null {
   const n = asNumber(value);
   if (n == null) return null;
@@ -152,6 +176,7 @@ export default function BacktestPage() {
   const { data: history, error: historyError } = useBacktestHistory();
   const { data: runs, error: runsError } = useBacktestRuns();
   const { data: comparisons } = useBacktestStrategyComparison();
+  const { data: research10y } = useCreditSpread10YResearch();
   const { data: catalog, error: catalogError } = useStrategyCatalog();
   const { data: walkforwardSummary } = useWalkforwardSummary();
 
@@ -168,6 +193,7 @@ export default function BacktestPage() {
         strategy_id: string;
         strategy_name: string;
         variant: string;
+        initial_capital?: number | null;
         status?: string;
         champion?: boolean;
         universe_note?: string;
@@ -176,38 +202,74 @@ export default function BacktestPage() {
 
     for (const item of catalog ?? []) {
       if (item.status === "archived") continue;
-      const key = `${item.strategy_id}|${item.variant}`;
-      map.set(key, {
-        key,
-        strategy_id: item.strategy_id,
-        strategy_name: item.strategy_name,
-        variant: item.variant,
-        status: item.status,
-        champion: item.champion,
-        universe_note: item.universe_note,
-      });
+      const matchingComparisons = (comparisons ?? []).filter(
+        (c) => c.strategy_id === item.strategy_id && c.variant === item.variant
+      );
+      if (matchingComparisons.length === 0) {
+        const key = `${item.strategy_id}|${item.variant}|cap${capitalKey(undefined)}`;
+        map.set(key, {
+          key,
+          strategy_id: item.strategy_id,
+          strategy_name: item.strategy_name,
+          variant: item.variant,
+          initial_capital: undefined,
+          status: item.status,
+          champion: item.champion,
+          universe_note: item.universe_note,
+        });
+        continue;
+      }
+      for (const comparison of matchingComparisons) {
+        const key = `${item.strategy_id}|${item.variant}|cap${capitalKey(comparison.initial_capital)}`;
+        map.set(key, {
+          key,
+          strategy_id: item.strategy_id,
+          strategy_name: item.strategy_name,
+          variant: item.variant,
+          initial_capital: comparison.initial_capital,
+          status: item.status,
+          champion: item.champion,
+          universe_note: item.universe_note,
+        });
+      }
     }
 
     return Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key));
-  }, [catalog]);
+  }, [catalog, comparisons]);
 
   const latestKey =
-    latest?.strategy_id && latest?.variant ? `${latest.strategy_id}|${latest.variant}` : "";
+    latest?.strategy_id && latest?.variant
+      ? `${latest.strategy_id}|${latest.variant}|cap${capitalKey(latest.initial_capital)}`
+      : "";
+
+  const championKey = useMemo(
+    () => tabs.find((tab) => tab.champion)?.key ?? "",
+    [tabs]
+  );
 
   const defaultKey = useMemo(() => {
     if (selectedTab && tabs.some((t) => t.key === selectedTab)) return selectedTab;
+    if (championKey && tabs.some((t) => t.key === championKey)) return championKey;
     if (latestKey && tabs.some((t) => t.key === latestKey)) return latestKey;
     return tabs[0]?.key ?? latestKey;
-  }, [selectedTab, latestKey, tabs]);
+  }, [championKey, selectedTab, latestKey, tabs]);
 
-  const [strategyId, variant] = defaultKey ? defaultKey.split("|") : ["", ""];
+  const selectedTabMeta = tabs.find((t) => t.key === defaultKey);
+  const strategyId = selectedTabMeta?.strategy_id ?? "";
+  const variant = selectedTabMeta?.variant ?? "";
+  const selectedInitialCapital = selectedTabMeta?.initial_capital;
 
   const selectedRuns = useMemo(
     () =>
       allRuns
-        .filter((r) => r.strategy_id === strategyId && r.variant === variant)
+        .filter(
+          (r) =>
+            r.strategy_id === strategyId &&
+            r.variant === variant &&
+            capitalMatches(r.initial_capital, selectedInitialCapital)
+        )
         .sort((a, b) => (a.generated_at < b.generated_at ? 1 : -1)),
-    [allRuns, strategyId, variant]
+    [allRuns, strategyId, variant, selectedInitialCapital]
   );
 
   const representativeRun = useMemo(
@@ -230,13 +292,30 @@ export default function BacktestPage() {
   const heatmap = buildHeatmap(monthly);
 
   const selectedComparison = (comparisons ?? []).find(
-    (c) => c.strategy_id === strategyId && c.variant === variant
+    (c) =>
+      c.strategy_id === strategyId &&
+      c.variant === variant &&
+      capitalMatches(c.initial_capital, selectedInitialCapital)
   );
-  const wfKey = `${strategyId}|${variant}|${effectiveRun?.universe_profile ?? ""}`;
-  const selectedWf = walkforwardSummary?.[wfKey];
+  const researchVariant =
+    strategyId && variant
+      ? research10y?.variants_by_key?.[`${strategyId}|${variant}`]
+      : undefined;
+  const researchMonthly = researchVariant?.full_period.monthly_returns ?? [];
+  const researchHeatmap = buildHeatmap(researchMonthly);
+  const researchMetrics = researchVariant?.full_period.metrics;
+  const researchOos = researchVariant?.walkforward_summary;
+  const wfKey = `${strategyId}|${variant}|${effectiveRun?.universe_profile ?? ""}|cap${capitalKey(effectiveRun?.initial_capital ?? selectedInitialCapital)}`;
+  const wfFallbackKey = `${strategyId}|${variant}|${effectiveRun?.universe_profile ?? ""}`;
+  const selectedWf = walkforwardSummary?.[wfKey] ?? walkforwardSummary?.[wfFallbackKey];
 
   const historyRows = Object.values(history ?? {})
-    .filter((row) => row.strategy_id === strategyId && row.variant === variant)
+    .filter(
+      (row) =>
+        row.strategy_id === strategyId &&
+        row.variant === variant &&
+        capitalMatches(row.initial_capital, selectedInitialCapital)
+    )
     .sort((a, b) => (a.start_date < b.start_date ? -1 : 1));
 
   const timeline = selectedRuns.slice(0, 30);
@@ -259,11 +338,11 @@ export default function BacktestPage() {
   const featureTimeMode =
     (effectiveRun?.feature_time_mode as string | undefined) ??
     (effectiveRun?.strategy_parameters?.feature_time_mode as string | undefined) ??
-    "—";
+    "N/A";
   const dataQualityPolicy =
     (effectiveRun?.data_quality_policy as string | undefined) ??
     (effectiveRun?.strategy_parameters?.data_quality_policy as string | undefined) ??
-    "—";
+    "N/A";
   const rejections = effectiveRun?.rejection_counts ?? {};
   const oosReturn = asNumber(oos?.avg_total_return_pct);
   const oosSharpe = asNumber(oos?.avg_sharpe_ratio);
@@ -317,7 +396,6 @@ export default function BacktestPage() {
                   }`}
                 >
                   <div className="flex items-center gap-1.5">
-                    {tab.champion && <span className="text-xs">👑</span>}
                     <span className="font-semibold">{tab.strategy_name}</span>
                   </div>
                   <div className="text-[11px] font-mono opacity-90">{tab.strategy_id} | {tab.variant}</div>
@@ -329,9 +407,21 @@ export default function BacktestPage() {
                     )}
                     <span className={`px-1.5 py-0.5 rounded text-[10px] ${active && !tab.champion ? "bg-pink-700" : "bg-gray-700"}`}>{mode}</span>
                     <span className={`px-1.5 py-0.5 rounded text-[10px] ${active && !tab.champion ? "bg-pink-700" : "bg-gray-700"}`}>{family}</span>
+                    {research10y?.covered_strategy_keys?.includes(
+                      `${tab.strategy_id}|${tab.variant}`
+                    ) && (
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] border ${active && !tab.champion ? "bg-sky-700/60 border-sky-500 text-sky-50" : "bg-sky-950/40 border-sky-800 text-sky-300"}`}>
+                        10Y Research
+                      </span>
+                    )}
                     {uLabel && (
                       <span className={`px-1.5 py-0.5 rounded text-[10px] ${active && !tab.champion ? "bg-pink-700" : "bg-gray-700/70"}`}>
                         {uLabel}
+                      </span>
+                    )}
+                    {capitalLabel(tab.initial_capital) && (
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] ${active && !tab.champion ? "bg-pink-700" : "bg-gray-700/70"}`}>
+                        {capitalLabel(tab.initial_capital)}
                       </span>
                     )}
                   </div>
@@ -652,6 +742,121 @@ export default function BacktestPage() {
         </div>
       </div>
 
+      {researchVariant && researchMetrics && researchOos && (
+        <div className="bg-sky-950/20 rounded-xl border border-sky-900/60 p-5 space-y-5">
+          <div className="flex items-start justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-sky-200 uppercase tracking-wider mb-2">10-Year Research</h3>
+              <p className="text-xs text-sky-200/70 max-w-3xl">
+                Research-only extension built from the local SPY/QQQ cache plus a filled ETF price-history gap.
+                These numbers do not replace the official persisted dashboard metrics above.
+              </p>
+            </div>
+            <div className="text-[11px] px-2 py-1 rounded border bg-sky-900/40 text-sky-300 border-sky-700">
+              Research Only
+            </div>
+          </div>
+
+          {researchVariant.sample_warning && (
+            <div className="rounded-lg border border-amber-800 bg-amber-950/40 px-4 py-3 text-sm text-amber-200">
+              {researchVariant.sample_warning_reason}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-4">
+            <StatCard
+              label="10Y Return"
+              value={`${(researchMetrics.total_return_pct ?? 0) >= 0 ? "+" : ""}${(researchMetrics.total_return_pct ?? 0).toFixed(2)}%`}
+              color={(researchMetrics.total_return_pct ?? 0) >= 0 ? "green" : "red"}
+            />
+            <StatCard
+              label="10Y Sharpe"
+              value={researchMetrics.sharpe_ratio == null ? "—" : researchMetrics.sharpe_ratio.toFixed(2)}
+              color={(researchMetrics.sharpe_ratio ?? 0) >= 0 ? "green" : "red"}
+            />
+            <StatCard
+              label="10Y Max DD"
+              value={researchMetrics.max_drawdown_pct == null ? "—" : `${researchMetrics.max_drawdown_pct.toFixed(2)}%`}
+              color="red"
+            />
+            <StatCard
+              label="Trades"
+              value={researchMetrics.total_trades?.toString() ?? "—"}
+            />
+            <StatCard
+              label="OOS Return"
+              value={researchOos.avg_total_return_pct == null ? "—" : `${researchOos.avg_total_return_pct >= 0 ? "+" : ""}${researchOos.avg_total_return_pct.toFixed(2)}%`}
+              color={researchOos.avg_total_return_pct == null ? "default" : researchOos.avg_total_return_pct >= 0 ? "green" : "red"}
+            />
+            <StatCard
+              label="OOS Sharpe"
+              value={researchOos.avg_sharpe_ratio == null ? "—" : researchOos.avg_sharpe_ratio.toFixed(2)}
+              color={researchOos.avg_sharpe_ratio == null ? "default" : researchOos.avg_sharpe_ratio >= 0.7 ? "green" : "amber"}
+            />
+            <StatCard
+              label="OOS Max DD"
+              value={researchOos.avg_max_drawdown_pct == null ? "—" : `${researchOos.avg_max_drawdown_pct.toFixed(2)}%`}
+              color={researchOos.avg_max_drawdown_pct == null ? "default" : researchOos.avg_max_drawdown_pct <= 30 ? "green" : "red"}
+            />
+            <StatCard
+              label="Validation"
+              value={researchOos.pass_validation ? "PASS" : "FAIL"}
+              color={researchOos.pass_validation ? "green" : "red"}
+            />
+          </div>
+
+          <div>
+            <p className="text-xs text-sky-200/70 mb-2">10-Year Monthly Returns Heatmap</p>
+            {researchMonthly.length === 0 ? (
+              <p className="text-sky-200/60 text-sm">No research monthly returns series available for this variant.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-sky-200/70">
+                      <th className="text-left pb-2 pr-2">Year</th>
+                      {MONTHS.map((month) => (
+                        <th key={month} className="pb-2 px-1">{month}</th>
+                      ))}
+                      <th className="text-right pb-2 pl-2">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {researchHeatmap.years.map((year) => {
+                      const yearTotal = Object.values(researchHeatmap.rows[year] ?? {}).reduce((sum, value) => sum + value, 0);
+                      return (
+                        <tr key={year}>
+                          <td className="py-1 pr-2 text-sky-100/80 font-mono">{year}</td>
+                          {MONTHS.map((_, idx) => {
+                            const value = researchHeatmap.rows[year][idx];
+                            return (
+                              <td key={`${year}-${idx}`} className="px-1 py-1">
+                                <div
+                                  className="rounded px-1 py-1 text-center text-[10px] text-white"
+                                  style={{ backgroundColor: heatColor(value) }}
+                                  title={value == null ? "No data" : `${value.toFixed(2)}%`}
+                                >
+                                  {value == null ? "—" : `${value.toFixed(1)}%`}
+                                </div>
+                              </td>
+                            );
+                          })}
+                          <td className="text-right pl-2 py-1">
+                            <span className={`font-mono font-semibold ${yearTotal >= 0 ? "text-green-400" : "text-red-400"}`}>
+                              {yearTotal >= 0 ? "+" : ""}{yearTotal.toFixed(1)}%
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Historical Period Results</h3>
         {historyError ? (
@@ -789,7 +994,12 @@ export default function BacktestPage() {
         ) : (
           <div className="space-y-2 text-sm">
             {(() => {
-              const tabMeta = tabs.find((t) => t.strategy_id === strategyId && t.variant === variant);
+              const tabMeta = tabs.find(
+                (t) =>
+                  t.strategy_id === strategyId &&
+                  t.variant === variant &&
+                  capitalMatches(t.initial_capital, selectedInitialCapital)
+              );
               return tabMeta?.champion ? (
                 <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-yellow-900/30 border border-yellow-700/50 rounded-lg">
                   <span>👑</span>
@@ -809,6 +1019,9 @@ export default function BacktestPage() {
             </p>
             <p className="text-gray-400">Engine: {effectiveRun.engine_type || "—"}</p>
             <p className="text-gray-400">Assumptions: {modeLabel(effectiveRun.assumptions_mode, effectiveRun.variant ?? "base")}</p>
+            {capitalLabel(effectiveRun.initial_capital) && (
+              <p className="text-gray-400">Initial Capital: {capitalLabel(effectiveRun.initial_capital)}</p>
+            )}
             <p className="text-gray-400">Universe Profile: {effectiveRun.universe_profile || "—"}</p>
             <p className="text-gray-400">Universe Size: {effectiveRun.universe_size ?? "—"}</p>
             <p className="text-gray-400">Universe: {effectiveRun.universe || "—"}</p>

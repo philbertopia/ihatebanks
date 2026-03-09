@@ -3,6 +3,7 @@ from datetime import date
 import pandas as pd
 
 from ovtlyr.backtester.intraday_features import get_intraday_variant
+from ovtlyr.backtester.intraday_features import observed_or_proxy_oi, observed_or_proxy_volume
 from ovtlyr.backtester.intraday_options_engine import (
     build_intraday_candidates_for_date,
     run_intraday_open_close_options,
@@ -98,3 +99,77 @@ def test_run_intraday_open_close_options_returns_backtest_payload():
     assert "intraday_report" in out
     assert "candidate_count_total" in out
     assert out["metrics"]["trading_days"] >= 1
+
+
+def test_build_daily_ratio_history_matches_manual_proxy_logic():
+    data = pd.DataFrame(
+        [
+            {
+                "date": "2025-06-03",
+                "underlying": "AAA",
+                "contract_symbol": "AAA1",
+                "open_interest": None,
+                "volume": None,
+                "delta": 0.80,
+                "spread_pct": 0.04,
+                "underlying_price": 100.0,
+            },
+            {
+                "date": "2025-06-03",
+                "underlying": "AAA",
+                "contract_symbol": "AAA2",
+                "open_interest": 120,
+                "volume": 18,
+                "delta": 0.70,
+                "spread_pct": 0.05,
+                "underlying_price": 100.0,
+            },
+            {
+                "date": "2025-06-04",
+                "underlying": "AAA",
+                "contract_symbol": "AAA3",
+                "open_interest": None,
+                "volume": 30,
+                "delta": 0.82,
+                "spread_pct": 0.03,
+                "underlying_price": 104.0,
+            },
+            {
+                "date": "2025-06-03",
+                "underlying": "BBB",
+                "contract_symbol": "BBB1",
+                "open_interest": 80,
+                "volume": None,
+                "delta": -0.65,
+                "spread_pct": 0.06,
+                "underlying_price": 55.0,
+            },
+        ]
+    )
+    data["date"] = pd.to_datetime(data["date"]).dt.date
+
+    underlying_df = _prepare_daily_underlying(data)
+    underlying_lookup = _build_underlying_lookup(underlying_df)
+
+    expected = {}
+    for (day, sym), frame in data.groupby(["date", "underlying"], sort=True):
+        u = underlying_lookup[(sym, day)]
+        ratios = []
+        for _, row in frame.iterrows():
+            oi_effective, _ = observed_or_proxy_oi(row.get("open_interest"), row.get("spread_pct"))
+            vol_effective, _ = observed_or_proxy_volume(
+                row.get("volume"),
+                row.get("delta"),
+                u.get("atr_pct"),
+                u.get("abs_return_pct"),
+                row.get("spread_pct"),
+            )
+            ratios.append(float(vol_effective) / max(float(oi_effective), 1.0))
+        ratios_sorted = sorted(ratios)
+        expected.setdefault(sym, []).append((day, ratios_sorted[len(ratios_sorted) // 2]))
+
+    actual = _build_daily_ratio_history(data, underlying_lookup)
+
+    assert actual.keys() == expected.keys()
+    for sym in expected:
+        assert actual[sym] == expected[sym]

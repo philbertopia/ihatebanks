@@ -76,6 +76,23 @@ def _coerce_profit_factor(value):
     return x
 
 
+def _normalize_initial_capital(value, default=100000.0):
+    try:
+        capital = float(value)
+    except (TypeError, ValueError):
+        capital = float(default)
+    if capital <= 0:
+        capital = float(default)
+    return round(capital, 2)
+
+
+def _capital_token(value):
+    capital = _normalize_initial_capital(value)
+    if capital.is_integer():
+        return str(int(capital))
+    return f"{capital:.2f}".replace(".", "p")
+
+
 def _period_span_days(run):
     from datetime import date
     def _parse(v):
@@ -108,7 +125,11 @@ def _select_canonical_run(entries):
 def build_strategies(runs):
     grouped = {}
     for run in runs:
-        key = f"{run.get('strategy_id', 'unknown')}|{run.get('variant', 'base')}"
+        key = (
+            f"{run.get('strategy_id', 'unknown')}|"
+            f"{run.get('variant', 'base')}|"
+            f"cap{_capital_token(run.get('initial_capital'))}"
+        )
         grouped.setdefault(key, []).append(run)
 
     result = []
@@ -137,6 +158,7 @@ def build_strategies(runs):
             "strategy_id": latest.get("strategy_id", "unknown"),
             "strategy_name": latest.get("strategy_name", latest.get("strategy_id", "unknown")),
             "variant": latest.get("variant", "base"),
+            "initial_capital": _normalize_initial_capital(latest.get("initial_capital")),
             "engine_type": latest.get("engine_type", ""),
             "assumptions_mode": latest.get("assumptions_mode", latest.get("variant", "")),
             "universe_profile": latest.get("universe_profile", ""),
@@ -172,7 +194,16 @@ def build_strategies(runs):
             "has_component_metrics": any(bool(e.get("component_metrics")) for e in entries),
         })
 
-    return _json_safe(sorted(result, key=lambda r: (r["strategy_id"], r["variant"])))
+    return _json_safe(
+        sorted(
+            result,
+            key=lambda r: (
+                r["strategy_id"],
+                r["variant"],
+                _normalize_initial_capital(r.get("initial_capital")),
+            ),
+        )
+    )
 
 
 def main():

@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import sys
+from copy import deepcopy
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Tuple
 
@@ -62,6 +63,15 @@ BACKTEST_RUNS_PATH = "data/backtest_runs.json"
 WALKFORWARD_RUNS_PATH = "data/walkforward_runs.json"
 WALKFORWARD_SUMMARY_PATH = "data/walkforward_summary.json"
 STRATEGY_CATALOG_PATH = "data/strategy_catalog.json"
+INTRADAY_PROFITABILITY_REPORT_PATH = "data/reports/intraday_profitability_sweep.json"
+INTRADAY_PROFITABILITY_SWEEP_VARIANTS = [
+    "baseline",
+    "conservative",
+    "conservative_v2",
+    "conservative_regime_lite",
+    "conservative_hist_55",
+    "conservative_scan_quality",
+]
 
 
 # ──────────────────────────────────────────────
@@ -93,6 +103,9 @@ def default_strategy_name(strategy_id: str) -> str:
         "research_buywrite_spy": "Research BuyWrite SPY",
         "research_collar_spy": "Research Collar SPY",
         "research_small_account_options": "Research Small Account Options",
+        "research_index_swing_options": "Research Index Swing Options",
+        "research_index_convex_swing": "Research Index Convex Swing",
+        "spx_0dte_put_spread": "SPX 0DTE Short Put Spread",
     }
     return names.get(strategy_id, strategy_id.replace("_", " ").title())
 
@@ -117,6 +130,20 @@ def resolve_universe(args, config: dict) -> Tuple[str, List[str]]:
     return profile, symbols
 
 
+def _filter_backtest_data_to_universe(data, universe_symbols: List[str]):
+    if data is None or getattr(data, "empty", True):
+        return data
+    if not universe_symbols or "underlying" not in data.columns:
+        return data
+
+    allowed = {str(symbol).upper() for symbol in universe_symbols if str(symbol).strip()}
+    if not allowed:
+        return data
+
+    mask = data["underlying"].astype(str).str.upper().isin(allowed)
+    return data.loc[mask].copy()
+
+
 def _round_obj(value: Any) -> Any:
     if isinstance(value, float):
         return round(value, 4)
@@ -131,12 +158,93 @@ def _load_json(path: str, default):
     if not os.path.exists(path):
         return default
     with open(path, "r") as f:
-        return json.load(f)
+        raw = f.read().strip()
+    if not raw:
+        return default
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        try:
+            value, end = json.JSONDecoder().raw_decode(raw)
+        except json.JSONDecodeError:
+            logger.warning(f"Failed to parse JSON at {path}; using default fallback")
+            return default
+        trailing = raw[end:].strip()
+        if trailing:
+            logger.warning(
+                f"Recovered leading JSON payload from malformed file {path}; ignoring trailing data"
+            )
+        return value
 
 
-def _build_run_id(strategy_id: str, variant: str, period_key: str) -> str:
+def _normalize_initial_capital(value: Any, default: float = 100_000.0) -> float:
+    try:
+        capital = float(value)
+    except (TypeError, ValueError):
+        capital = float(default)
+    if capital <= 0:
+        capital = float(default)
+    return round(capital, 2)
+
+
+def _capital_matches(row_capital: Any, target_capital: Any) -> bool:
+    return _normalize_initial_capital(row_capital) == _normalize_initial_capital(
+        target_capital
+    )
+
+
+def _capital_token(initial_capital: Any) -> str:
+    capital = _normalize_initial_capital(initial_capital)
+    if capital.is_integer():
+        return str(int(capital))
+    return f"{capital:.2f}".replace(".", "p")
+
+
+def _resolve_stock_replacement_initial_capital(args, config: Dict[str, Any]) -> float:
+    backtest_cfg = config.get("backtest", {}) if isinstance(config, dict) else {}
+    default = (
+        backtest_cfg.get("initial_capital", 100_000.0)
+        if isinstance(backtest_cfg, dict)
+        else 100_000.0
+    )
+    raw = getattr(args, "initial_capital", None)
+    if raw is None:
+        raw = default
+    return _normalize_initial_capital(raw, default=100_000.0)
+
+
+def _with_backtest_initial_capital(
+    config: Dict[str, Any], initial_capital: float
+) -> Dict[str, Any]:
+    cfg = deepcopy(config)
+    cfg.setdefault("backtest", {})
+    cfg["backtest"]["initial_capital"] = _normalize_initial_capital(initial_capital)
+    return cfg
+
+
+def _build_run_id(
+    strategy_id: str,
+    variant: str,
+    period_key: str,
+    initial_capital: Any = None,
+) -> str:
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    return f"{strategy_id}:{variant}:{period_key}:{ts}"
+    capital_part = ""
+    if initial_capital is not None:
+        capital_part = f":cap{_capital_token(initial_capital)}"
+    return f"{strategy_id}:{variant}:{period_key}{capital_part}:{ts}"
+
+
+def _build_walkforward_summary_key(
+    strategy_id: str,
+    variant: str,
+    universe_profile: str,
+    initial_capital: Any = None,
+) -> str:
+    key = f"{strategy_id}|{variant}|{universe_profile}"
+    if initial_capital is not None:
+        key = f"{key}|cap{_capital_token(initial_capital)}"
+    return key
 
 
 def _resolve_period(
@@ -367,7 +475,10 @@ def _build_allocation_decision(
 
 
 def _load_latest_oos_summary(
-    strategy_id: str, variant: str, universe_profile: str
+    strategy_id: str,
+    variant: str,
+    universe_profile: str,
+    initial_capital: Any = None,
 ) -> Dict[str, Any] | None:
     rows = _load_json(WALKFORWARD_RUNS_PATH, [])
     if not isinstance(rows, list):
@@ -377,6 +488,7 @@ def _load_latest_oos_summary(
         for r in rows
         if str(r.get("strategy_id")) == str(strategy_id)
         and str(r.get("variant")) == str(variant)
+        and _capital_matches(r.get("initial_capital"), initial_capital)
     ]
     if not candidates:
         return None
@@ -413,10 +525,125 @@ def _profile_matches(row_profile: Any, target_profile: str) -> bool:
     return row == "" and target != ""
 
 
+def _metric_float(value: Any, default: float = 0.0) -> float:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return default
+    return out if out == out else default
+
+
+def _count_monthly_points(run: Dict[str, Any]) -> int:
+    series = run.get("series", {})
+    if not isinstance(series, dict):
+        return 0
+    monthly = series.get("monthly_returns", [])
+    return len(monthly) if isinstance(monthly, list) else 0
+
+
+def _find_latest_backtest_run(
+    strategy_id: str,
+    variant: str,
+    universe_profile: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    initial_capital: Any = None,
+) -> Dict[str, Any] | None:
+    runs = _load_json(BACKTEST_RUNS_PATH, [])
+    if not isinstance(runs, list):
+        return None
+
+    candidates = [
+        r
+        for r in runs
+        if str(r.get("strategy_id")) == str(strategy_id)
+        and str(r.get("variant")) == str(variant)
+        and _profile_matches(r.get("universe_profile", ""), universe_profile)
+        and _capital_matches(r.get("initial_capital"), initial_capital)
+    ]
+    if not candidates:
+        return None
+
+    if start_date and end_date:
+        candidates = [
+            r
+            for r in candidates
+            if str(r.get("start_date", "")) == str(start_date)
+            and str(r.get("end_date", "")) == str(end_date)
+        ]
+        if not candidates:
+            return None
+
+    candidates.sort(key=lambda r: str(r.get("generated_at", "")), reverse=True)
+    return candidates[0]
+
+
+def _build_intraday_profitability_row(run: Dict[str, Any], source: str) -> Dict[str, Any]:
+    metrics = run.get("metrics", {}) if isinstance(run.get("metrics"), dict) else {}
+    oos = run.get("oos_summary", {}) if isinstance(run.get("oos_summary"), dict) else {}
+    return {
+        "variant": str(run.get("variant", "")),
+        "source": source,
+        "run_id": str(run.get("run_id", "")),
+        "generated_at": str(run.get("generated_at", "")),
+        "start_date": str(run.get("start_date", "")),
+        "end_date": str(run.get("end_date", "")),
+        "total_return_pct": _metric_float(metrics.get("total_return_pct")),
+        "sharpe_ratio": _metric_float(metrics.get("sharpe_ratio")),
+        "max_drawdown_pct": _metric_float(metrics.get("max_drawdown_pct")),
+        "profit_factor": _metric_float(metrics.get("profit_factor")),
+        "win_rate": _metric_float(metrics.get("win_rate")),
+        "total_trades": int(_metric_float(metrics.get("total_trades"))),
+        "candidate_count_total": int(_metric_float(run.get("candidate_count_total"))),
+        "candidate_count_qualified": int(
+            _metric_float(run.get("candidate_count_qualified"))
+        ),
+        "monthly_points": _count_monthly_points(run),
+        "pass_validation": bool(oos.get("pass_validation", False)),
+        "oos_return_pct": _metric_float(oos.get("avg_total_return_pct")),
+        "oos_sharpe_ratio": _metric_float(oos.get("avg_sharpe_ratio")),
+        "oos_max_drawdown_pct": _metric_float(oos.get("avg_max_drawdown_pct")),
+    }
+
+
+def _rank_intraday_profitability_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return sorted(
+        rows,
+        key=lambda row: (
+            -_metric_float(row.get("total_return_pct"), default=-1e12),
+            -_metric_float(row.get("sharpe_ratio"), default=-1e12),
+            -_metric_float(row.get("profit_factor"), default=-1e12),
+            _metric_float(row.get("max_drawdown_pct"), default=1e12),
+            -_metric_float(row.get("total_trades"), default=-1e12),
+        ),
+    )
+
+
+def _rank_intraday_stability_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return sorted(
+        rows,
+        key=lambda row: (
+            -_metric_float(row.get("sharpe_ratio"), default=-1e12),
+            _metric_float(row.get("max_drawdown_pct"), default=1e12),
+            -_metric_float(row.get("profit_factor"), default=-1e12),
+            -_metric_float(row.get("total_return_pct"), default=-1e12),
+        ),
+    )
+
+
+def _write_json_file(path: str, payload: Any) -> None:
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(_round_obj(payload), f, indent=2)
+
+
 def _attach_oos_to_backtest_payloads(
     strategy_id: str,
     variant: str,
     universe_profile: str,
+    initial_capital: Any,
     oos_summary: Dict[str, Any],
     walkforward_id: str,
 ) -> None:
@@ -428,6 +655,7 @@ def _attach_oos_to_backtest_payloads(
                 str(row.get("strategy_id")) == str(strategy_id)
                 and str(row.get("variant")) == str(variant)
                 and _profile_matches(row.get("universe_profile", ""), universe_profile)
+                and _capital_matches(row.get("initial_capital"), initial_capital)
             ):
                 row["oos_summary"] = oos_summary
                 row["walkforward_id"] = walkforward_id
@@ -446,6 +674,7 @@ def _attach_oos_to_backtest_payloads(
                 str(row.get("strategy_id")) == str(strategy_id)
                 and str(row.get("variant")) == str(variant)
                 and _profile_matches(row.get("universe_profile", ""), universe_profile)
+                and _capital_matches(row.get("initial_capital"), initial_capital)
             ):
                 row["oos_summary"] = oos_summary
                 row["walkforward_id"] = walkforward_id
@@ -461,6 +690,7 @@ def _attach_oos_to_backtest_payloads(
             str(latest.get("strategy_id")) == str(strategy_id)
             and str(latest.get("variant")) == str(variant)
             and _profile_matches(latest.get("universe_profile", ""), universe_profile)
+            and _capital_matches(latest.get("initial_capital"), initial_capital)
         ):
             latest["oos_summary"] = oos_summary
             latest["walkforward_id"] = walkforward_id
@@ -476,7 +706,10 @@ def _persist_backtest_payload(payload: Dict[str, Any]) -> None:
         json.dump(payload, f, indent=2)
 
     history = _load_json(BACKTEST_HISTORY_PATH, {})
-    history_key = f"{payload.get('strategy_id')}|{payload.get('variant')}|{payload.get('period_key')}"
+    history_key = (
+        f"{payload.get('strategy_id')}|{payload.get('variant')}|"
+        f"{payload.get('period_key')}|cap{_capital_token(payload.get('initial_capital'))}"
+    )
     history[history_key] = payload
     with open(BACKTEST_HISTORY_PATH, "w") as f:
         json.dump(history, f, indent=2)
@@ -917,7 +1150,7 @@ def cmd_intraday_report(args, config, repo, clients):
     from tabulate import tabulate
 
     collector = BacktestDataCollector(clients, config)
-    data = collector.load_cached_data()
+    data = collector.load_cached_data(start=args.start, end=args.end)
     if data.empty:
         print(
             "No cached data found. Run 'python main.py generate' or 'python main.py collect' first."
@@ -1008,14 +1241,24 @@ def cmd_backtest(args, config, repo, clients):
     normalized_variant = (
         normalize_variant(variant) if strategy_id == "stock_replacement" else variant
     )
+    if strategy_id == "spx_0dte_put_spread" and normalized_variant == "base":
+        normalized_variant = "balanced"
 
     effective_config = config
+    initial_capital = None
     if strategy_id == "stock_replacement":
         effective_config = apply_stock_replacement_variant(config, normalized_variant)
         print(f"Stock-replacement variant: {normalized_variant}")
+        if effective_config.get("strategy", {}).get("strategy_type", "") != "wheel":
+            initial_capital = _resolve_stock_replacement_initial_capital(args, config)
+            effective_config = apply_stock_replacement_variant(
+                _with_backtest_initial_capital(config, initial_capital),
+                normalized_variant,
+            )
+            print(f"Initial capital: ${initial_capital:,.0f}")
 
     collector = BacktestDataCollector(clients, effective_config)
-    data = collector.load_cached_data()
+    data = collector.load_cached_data(start=args.start, end=args.end)
     if data.empty:
         print(
             "No cached data found. Run 'python main.py collect' or 'python main.py generate' first."
@@ -1025,6 +1268,12 @@ def cmd_backtest(args, config, repo, clients):
     print(f"Loaded {len(data)} rows of cached option data")
     universe_profile, universe_symbols = resolve_universe(args, config)
     print(f"Universe profile: {universe_profile} ({len(universe_symbols)} symbols)")
+    if strategy_id == "stock_replacement":
+        data = _filter_backtest_data_to_universe(data, universe_symbols)
+        if data.empty:
+            print(f"No cached rows matched universe '{universe_profile}'.")
+            return
+        print(f"Filtered to {len(data)} rows across {data['underlying'].nunique()} symbols")
     try:
         start, end = _resolve_period(data, args.start, args.end)
     except ValueError as e:
@@ -1061,6 +1310,7 @@ def cmd_backtest(args, config, repo, clients):
         assumptions_mode = args.assumptions_mode or "realistic_priced"
     elif strategy_id == "stock_replacement":
         engine = BacktestEngine(data, effective_config)
+        initial_capital = engine.initial_capital
         metrics = engine.run(start, end)
         trading_days = _trading_days_for_period(data, start, end)
         equity_curve = [float(v) for v in engine.equity_curve]
@@ -1108,6 +1358,7 @@ def cmd_backtest(args, config, repo, clients):
         strategy_id=strategy_id,
         variant=normalized_variant,
         universe_profile=universe_profile,
+        initial_capital=initial_capital,
     )
     execution_realism = {
         k: metrics.get(k)
@@ -1128,10 +1379,13 @@ def cmd_backtest(args, config, repo, clients):
         "kill_switch_expectancy_r": metrics.get("kill_switch_expectancy_r"),
     }
     payload = {
-        "run_id": _build_run_id(strategy_id, normalized_variant, period_key),
+        "run_id": _build_run_id(
+            strategy_id, normalized_variant, period_key, initial_capital
+        ),
         "strategy_id": strategy_id,
         "strategy_name": strategy_name,
         "variant": normalized_variant,
+        "initial_capital": initial_capital,
         "engine_type": engine_type,
         "assumptions_mode": assumptions_mode,
         "strategy_parameters": strategy_parameters,
@@ -1197,9 +1451,11 @@ def cmd_backtest_walkforward(args, config, repo, clients):
     normalized_variant = (
         normalize_variant(variant) if strategy_id == "stock_replacement" else variant
     )
+    if strategy_id == "spx_0dte_put_spread" and normalized_variant == "base":
+        normalized_variant = "balanced"
 
     collector = BacktestDataCollector(clients, config)
-    data = collector.load_cached_data()
+    data = collector.load_cached_data(start=args.start, end=args.end)
     if data.empty:
         print(
             "No cached data found. Run 'python main.py collect' or 'python main.py generate' first."
@@ -1208,6 +1464,12 @@ def cmd_backtest_walkforward(args, config, repo, clients):
 
     universe_profile, universe_symbols = resolve_universe(args, config)
     print(f"Universe profile: {universe_profile} ({len(universe_symbols)} symbols)")
+    if strategy_id == "stock_replacement":
+        data = _filter_backtest_data_to_universe(data, universe_symbols)
+        if data.empty:
+            print(f"No cached rows matched universe '{universe_profile}'.")
+            return
+        print(f"Filtered to {len(data)} rows across {data['underlying'].nunique()} symbols")
     try:
         start, end = _resolve_period(data, args.start, args.end)
     except ValueError as e:
@@ -1229,6 +1491,7 @@ def cmd_backtest_walkforward(args, config, repo, clients):
     )
 
     is_wheel_wf = strategy_id == "stock_replacement" and normalized_variant.startswith("wheel_")
+    initial_capital = None
     actual_universe = ",".join(universe_symbols)
     actual_universe_size = len(universe_symbols)
 
@@ -1241,10 +1504,13 @@ def cmd_backtest_walkforward(args, config, repo, clients):
             wf_metrics = run_wheel_backtest(data, effective_config, w.test_start, w.test_end)
             m = {k: v for k, v in wf_metrics.items() if k not in ("equity_curve", "closed_trades")}
         elif strategy_id == "stock_replacement":
+            initial_capital = _resolve_stock_replacement_initial_capital(args, config)
             effective_config = apply_stock_replacement_variant(
-                config, normalized_variant
+                _with_backtest_initial_capital(config, initial_capital),
+                normalized_variant,
             )
             engine = BacktestEngine(data, effective_config)
+            initial_capital = engine.initial_capital
             m = engine.run(w.test_start, w.test_end)
         else:
             # Warm up long-lookback indicators before the OOS window so strategies
@@ -1291,7 +1557,10 @@ def cmd_backtest_walkforward(args, config, repo, clients):
         "openclaw_call_credit_spread":  {"sharpe": 0.70, "max_dd": 30.0},
         "openclaw_regime_credit_spread": {"sharpe": 0.70, "max_dd": 30.0},
         "openclaw_put_credit_spread":   {"sharpe": 0.70, "max_dd": 30.0},
+        "spx_0dte_put_spread":          {"sharpe": 0.50, "max_dd": 35.0},
         "research_small_account_options": {"sharpe": 0.40, "max_dd": 35.0},
+        "research_index_swing_options": {"sharpe": 0.40, "max_dd": 35.0},
+        "research_index_convex_swing": {"sharpe": 0.40, "max_dd": 35.0},
     }
     if is_wheel_wf:
         _family_key = "wheel"
@@ -1309,7 +1578,10 @@ def cmd_backtest_walkforward(args, config, repo, clients):
         max_dd_threshold=max_dd_threshold,
     )
     wf_id = _build_run_id(
-        strategy_id, normalized_variant, f"wf-{start.strftime('%Y%m')}"
+        strategy_id,
+        normalized_variant,
+        f"wf-{start.strftime('%Y%m')}",
+        initial_capital,
     )
     oos_summary["walkforward_id"] = wf_id
 
@@ -1318,6 +1590,7 @@ def cmd_backtest_walkforward(args, config, repo, clients):
         "strategy_id": strategy_id,
         "strategy_name": strategy_name,
         "variant": normalized_variant,
+        "initial_capital": initial_capital,
         "universe_profile": universe_profile,
         "universe_size": actual_universe_size,
         "universe": actual_universe,
@@ -1342,12 +1615,15 @@ def cmd_backtest_walkforward(args, config, repo, clients):
     wf_summary = _load_json(WALKFORWARD_SUMMARY_PATH, {})
     if not isinstance(wf_summary, dict):
         wf_summary = {}
-    key = f"{strategy_id}|{normalized_variant}|{universe_profile}"
+    key = _build_walkforward_summary_key(
+        strategy_id, normalized_variant, universe_profile, initial_capital
+    )
     wf_summary[key] = {
         "walkforward_id": wf_id,
         "strategy_id": strategy_id,
         "strategy_name": strategy_name,
         "variant": normalized_variant,
+        "initial_capital": initial_capital,
         "universe_profile": universe_profile,
         "generated_at": payload["generated_at"],
         "oos_summary": _round_obj(oos_summary),
@@ -1359,6 +1635,7 @@ def cmd_backtest_walkforward(args, config, repo, clients):
         strategy_id=strategy_id,
         variant=normalized_variant,
         universe_profile=universe_profile,
+        initial_capital=initial_capital,
         oos_summary=_round_obj(oos_summary),
         walkforward_id=wf_id,
     )
@@ -1383,7 +1660,7 @@ def cmd_backtest_batch(args, config, repo, clients):
     from ovtlyr.backtester.openclaw_engines import run_openclaw_variant
 
     collector = BacktestDataCollector(clients, config)
-    data = collector.load_cached_data()
+    data = collector.load_cached_data(start=args.start, end=args.end)
     if data.empty:
         print(
             "No cached data found. Run 'python main.py generate' or 'python main.py collect' first."
@@ -1398,6 +1675,7 @@ def cmd_backtest_batch(args, config, repo, clients):
 
     universe_profile, universe_symbols = resolve_universe(args, config)
     print(f"Universe profile: {universe_profile} ({len(universe_symbols)} symbols)")
+    stock_replacement_data = _filter_backtest_data_to_universe(data, universe_symbols)
 
     matrix = [
         (
@@ -1712,6 +1990,12 @@ def cmd_backtest_batch(args, config, repo, clients):
         ),
         (
             "stock_replacement",
+            "Wheel Lower Call Cap",
+            "wheel_d30_c20",
+            "Wheel: sell -0.30 delta CSP → if assigned sell 0.20 delta covered call",
+        ),
+        (
+            "stock_replacement",
             "Wheel Conservative",
             "wheel_d20_c30",
             "Wheel: conservative -0.20 delta CSP → 0.30 delta covered call",
@@ -1778,6 +2062,84 @@ def cmd_backtest_batch(args, config, repo, clients):
             "Runs VIX-gated PCS in bullish regimes and CCS baseline only in outright bearish regimes, sitting out neutral periods",
         ),
         (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "timed_legacy_defensive_40_7_r075",
+            "Timed regime sweep: legacy PCS plus defensive CCS, requiring swing-entry timing gates with 40% profit capture, 7 DTE exit, and 0.75x risk",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "timed_legacy_defensive_40_10_r100",
+            "Timed regime sweep: legacy PCS plus defensive CCS, using timing gates with 40% profit capture and 10 DTE exit",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "timed_legacy_defensive_50_10_r100",
+            "Timed regime sweep baseline: legacy PCS plus defensive CCS with timing gates, 50% profit capture, and 10 DTE exit",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "timed_legacy_defensive_60_10_r100",
+            "Timed regime sweep: legacy PCS plus defensive CCS with timing gates, 60% profit capture, and 10 DTE exit",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "timed_legacy_defensive_50_14_r125",
+            "Timed regime sweep: legacy PCS plus defensive CCS with timing gates, 50% profit capture, 14 DTE exit, and 1.25x risk",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "timed_legacy_defensive_bear_only_40_10_r100",
+            "Timed regime sweep bear-only: neutral call entries disabled, 40% profit capture, 10 DTE exit",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "timed_legacy_defensive_bear_only_50_10_r100",
+            "Timed regime sweep bear-only baseline: neutral call entries disabled, 50% profit capture, 10 DTE exit",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "timed_legacy_defensive_bear_only_50_7_r075",
+            "Timed regime sweep bear-only: neutral call entries disabled, 50% profit capture, 7 DTE exit, and 0.75x risk",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "scored_legacy_defensive_s65",
+            "Scored regime sweep: legacy PCS plus defensive CCS, requiring a 65+ setup score before opening entries",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "scored_legacy_defensive_s70",
+            "Scored regime sweep: legacy PCS plus defensive CCS, requiring a 70+ setup score before opening entries",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "scored_legacy_defensive_s75",
+            "Scored regime sweep: legacy PCS plus defensive CCS, requiring a 75+ setup score before opening entries",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "scored_legacy_defensive_s80",
+            "Scored regime sweep: legacy PCS plus defensive CCS, requiring an 80+ setup score before opening entries",
+        ),
+        (
+            "openclaw_regime_credit_spread",
+            "OpenClaw Regime Credit Spread",
+            "scored_legacy_defensive_s75_vol",
+            "Scored regime sweep: 75+ setup score with volatility-targeted sizing around the legacy PCS plus defensive CCS router",
+        ),
+        (
             "research_small_account_options",
             "Research Small Account Options",
             "spy_iron_condor_proxy",
@@ -1801,6 +2163,78 @@ def cmd_backtest_batch(args, config, repo, clients):
             "aapl_long_call_low_iv",
             "AAPL long call using a low-IV filter as the buying counterpart to the 45/21 premium-selling setup",
         ),
+        (
+            "research_index_swing_options",
+            "Research Index Swing Options",
+            "pullback_baseline_30_45",
+            "SPY/QQQ swing hybrid: bull pullback + low IV uses a 30-45 DTE bull call spread, while higher-IV or bearish setups route into proven credit-spread templates",
+        ),
+        (
+            "research_index_swing_options",
+            "Research Index Swing Options",
+            "pullback_defensive_30_45",
+            "Defensive SPY/QQQ swing hybrid with tighter debit-spread stops, VIX-gated PCS entries, and defensive CCS routing in 30-45 DTE structures",
+        ),
+        (
+            "research_index_swing_options",
+            "Research Index Swing Options",
+            "pullback_baseline_45_60",
+            "SPY/QQQ swing hybrid using the same routing logic as baseline but with a 45-60 DTE debit-spread bucket",
+        ),
+        (
+            "research_index_swing_options",
+            "Research Index Swing Options",
+            "pullback_defensive_45_60",
+            "Defensive SPY/QQQ swing hybrid using a 45-60 DTE debit-spread bucket with lower risk per position",
+        ),
+        (
+            "research_index_swing_options",
+            "Research Index Swing Options",
+            "pullback_baseline_30_45_v2",
+            "Second-sweep SPY/QQQ hybrid with broader pullback and rally-fade triggers so high-IV PCS and CCS branches can fire more often in a 30-45 DTE bucket",
+        ),
+        (
+            "research_index_swing_options",
+            "Research Index Swing Options",
+            "pullback_defensive_30_45_v2",
+            "Defensive second-sweep SPY/QQQ hybrid that broadens triggers while keeping tighter debit-spread exits and defensive PCS/CCS routing in 30-45 DTE",
+        ),
+        (
+            "research_index_swing_options",
+            "Research Index Swing Options",
+            "pullback_baseline_45_60_v2",
+            "Second-sweep SPY/QQQ hybrid with broader trigger thresholds and a 45-60 DTE debit-spread bucket to test more frequent high-IV branch activation",
+        ),
+        (
+            "research_index_swing_options",
+            "Research Index Swing Options",
+            "pullback_defensive_45_60_v2",
+            "Defensive second-sweep SPY/QQQ hybrid using broader triggers plus defensive PCS/CCS templates in a 45-60 DTE debit-spread bucket",
+        ),
+        (
+            "research_index_convex_swing",
+            "Research Index Convex Swing",
+            "qqq_pullback_low_iv_30_45",
+            "QQQ convex swing: low-IV bullish pullback into a 30-45 DTE bull call debit spread",
+        ),
+        (
+            "research_index_convex_swing",
+            "Research Index Convex Swing",
+            "qqq_breakout_low_iv_30_45",
+            "QQQ convex swing: low-IV bullish breakout into a 30-45 DTE bull call debit spread",
+        ),
+        (
+            "research_index_convex_swing",
+            "Research Index Convex Swing",
+            "tqqq_pullback_low_iv_21_35",
+            "TQQQ convex swing: low-IV bullish pullback into a 21-35 DTE bull call debit spread",
+        ),
+        (
+            "research_index_convex_swing",
+            "Research Index Convex Swing",
+            "tqqq_breakout_low_iv_21_35",
+            "TQQQ convex swing: low-IV bullish breakout into a 21-35 DTE bull call debit spread",
+        ),
     ]
     period_key = start.strftime("%Y-%m")
 
@@ -1823,8 +2257,8 @@ def cmd_backtest_batch(args, config, repo, clients):
             from ovtlyr.backtester.wheel_engine import run_wheel_backtest
 
             effective_config = apply_stock_replacement_variant(config, mode)
-            metrics = run_wheel_backtest(data, effective_config, start, end)
-            trading_days = _trading_days_for_period(data, start, end)
+            metrics = run_wheel_backtest(stock_replacement_data, effective_config, start, end)
+            trading_days = _trading_days_for_period(stock_replacement_data, start, end)
             equity_curve = [float(v) for v in metrics.get("equity_curve", [100000])]
             trade_pnls = [
                 float(t.get("realized_pnl", 0.0))
@@ -1860,9 +2294,9 @@ def cmd_backtest_batch(args, config, repo, clients):
             from ovtlyr.backtester.engine import BacktestEngine
 
             effective_config = apply_stock_replacement_variant(config, mode)
-            engine = BacktestEngine(data, effective_config)
+            engine = BacktestEngine(stock_replacement_data, effective_config)
             metrics = engine.run(start, end)
-            trading_days = _trading_days_for_period(data, start, end)
+            trading_days = _trading_days_for_period(stock_replacement_data, start, end)
             equity_curve = [float(v) for v in engine.equity_curve]
             trade_pnls = [
                 float(t.get("realized_pnl", 0.0)) for t in engine.closed_trades
@@ -2196,6 +2630,179 @@ def cmd_intraday_sweep_validate(args, config, repo, clients):
         print("\nNo variant passed validation. All sweep variants remain experimental.")
 
 
+def cmd_intraday_sweep_profitability(args, config, repo, clients):
+    from ovtlyr.backtester.data_collector import BacktestDataCollector
+    from ovtlyr.backtester.intraday_features import get_intraday_variant
+
+    raw_variants = str(getattr(args, "variants", "") or "").strip()
+    if raw_variants:
+        sweep_variants = []
+        for token in raw_variants.split(","):
+            variant = token.strip()
+            if variant and variant not in sweep_variants:
+                sweep_variants.append(variant)
+    else:
+        sweep_variants = list(INTRADAY_PROFITABILITY_SWEEP_VARIANTS)
+
+    if not sweep_variants:
+        print("No intraday variants requested for profitability sweep.")
+        return
+
+    for variant in sweep_variants:
+        get_intraday_variant(variant)
+
+    collector = BacktestDataCollector(clients, config)
+    data = collector.load_cached_data(start=args.start, end=args.end)
+    if data.empty:
+        print(
+            "No cached data found. Run 'python main.py generate' or 'python main.py collect' first."
+        )
+        return
+
+    try:
+        start, end = _resolve_period(data, args.start, args.end)
+    except ValueError as e:
+        print(f"Cannot run intraday profitability sweep: {e}")
+        return
+
+    universe_profile, _ = resolve_universe(args, config)
+    start_iso = start.isoformat()
+    end_iso = end.isoformat()
+
+    print("\n" + "=" * 72)
+    print("INTRADAY PROFITABILITY SWEEP")
+    print("=" * 72)
+    print(
+        f"Strategy: intraday_open_close_options | Variants={len(sweep_variants)} | "
+        f"Period={start_iso} to {end_iso} | Universe={universe_profile}"
+    )
+    print(
+        "Ranking: total return desc, then Sharpe desc, profit factor desc, "
+        "max drawdown asc"
+    )
+
+    rows = []
+    reran_any = False
+    for variant in sweep_variants:
+        run = None
+        source = "cached"
+        if not bool(getattr(args, "force_rerun", False)):
+            run = _find_latest_backtest_run(
+                strategy_id="intraday_open_close_options",
+                variant=variant,
+                universe_profile=universe_profile,
+                start_date=start_iso,
+                end_date=end_iso,
+            )
+
+        if run is None:
+            print("\n" + "-" * 72)
+            print(f"Running variant: {variant}")
+            back_args = argparse.Namespace(**vars(args))
+            back_args.strategy_id = "intraday_open_close_options"
+            back_args.strategy_name = "Intraday Open-Close Options"
+            back_args.variant = variant
+            back_args.start = start_iso
+            back_args.end = end_iso
+            back_args.universe = universe_profile
+            back_args.notes = f"intraday_profitability_sweep:{variant}"
+            cmd_backtest(back_args, config, repo, clients)
+            reran_any = True
+            source = "rerun"
+            run = _find_latest_backtest_run(
+                strategy_id="intraday_open_close_options",
+                variant=variant,
+                universe_profile=universe_profile,
+                start_date=start_iso,
+                end_date=end_iso,
+            )
+        else:
+            print("\n" + "-" * 72)
+            print(f"Using cached run: {variant}")
+
+        if run is None:
+            print(f"  No completed run found for {variant}")
+            continue
+
+        row = _build_intraday_profitability_row(run, source)
+        rows.append(row)
+        print(
+            f"  return={row['total_return_pct']:+.2f}% | "
+            f"sharpe={row['sharpe_ratio']:.4f} | "
+            f"dd={row['max_drawdown_pct']:.2f}% | "
+            f"pf={row['profit_factor']:.2f} | "
+            f"trades={row['total_trades']} | "
+            f"months={row['monthly_points']}"
+        )
+
+    ranked = _rank_intraday_profitability_rows(rows)
+    stability_ranked = _rank_intraday_stability_rows(rows)
+
+    report = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "strategy_id": "intraday_open_close_options",
+        "strategy_name": "Intraday Open-Close Options",
+        "universe_profile": universe_profile,
+        "start_date": start_iso,
+        "end_date": end_iso,
+        "force_rerun": bool(getattr(args, "force_rerun", False)),
+        "variants": sweep_variants,
+        "rows": ranked,
+        "profitability_winner": ranked[0] if ranked else None,
+        "stability_winner": stability_ranked[0] if stability_ranked else None,
+    }
+    _write_json_file(INTRADAY_PROFITABILITY_REPORT_PATH, report)
+
+    print("\n" + "=" * 72)
+    print("INTRADAY PROFITABILITY SCOREBOARD")
+    print("=" * 72)
+    for row in ranked:
+        oos_note = "n/a"
+        if row["pass_validation"] or any(
+            row[key] != 0.0
+            for key in ("oos_return_pct", "oos_sharpe_ratio", "oos_max_drawdown_pct")
+        ):
+            oos_note = (
+                f"pass={row['pass_validation']} "
+                f"ret={row['oos_return_pct']:+.2f}% "
+                f"sharpe={row['oos_sharpe_ratio']:.2f} "
+                f"dd={row['oos_max_drawdown_pct']:.2f}%"
+            )
+        print(
+            f"{row['variant']}: "
+            f"Return={row['total_return_pct']:+.2f}% | "
+            f"Sharpe={row['sharpe_ratio']:.4f} | "
+            f"DD={row['max_drawdown_pct']:.2f}% | "
+            f"PF={row['profit_factor']:.2f} | "
+            f"WR={row['win_rate']:.2f}% | "
+            f"Trades={row['total_trades']} | "
+            f"Months={row['monthly_points']} | "
+            f"Source={row['source']} | "
+            f"OOS={oos_note}"
+        )
+
+    if ranked:
+        winner = ranked[0]
+        print(
+            f"\nMost profitable variant: {winner['variant']} "
+            f"({winner['total_return_pct']:+.2f}% return, "
+            f"Sharpe {winner['sharpe_ratio']:.4f}, "
+            f"DD {winner['max_drawdown_pct']:.2f}%)"
+        )
+    if stability_ranked:
+        leader = stability_ranked[0]
+        print(
+            f"Most stable variant: {leader['variant']} "
+            f"(Sharpe {leader['sharpe_ratio']:.4f}, "
+            f"DD {leader['max_drawdown_pct']:.2f}%, "
+            f"return {leader['total_return_pct']:+.2f}%)"
+        )
+
+    print(f"\nReport saved to {INTRADAY_PROFITABILITY_REPORT_PATH}")
+    if reran_any:
+        print("Refresh dashboard data with: python scripts/export_dashboard_data.py")
+
+
 def main():
     load_dotenv()
 
@@ -2233,6 +2840,7 @@ def main():
             "intraday-report",
             "backtest-walkforward",
             "intraday-sweep-validate",
+            "intraday-sweep-profitability",
             "validate-polygon",
         ],
     )
@@ -2281,7 +2889,7 @@ def main():
     parser.add_argument(
         "--strategy-name",
         type=str,
-        default="Stock Replacement",
+        default=None,
         help="Backtest strategy display name",
     )
     parser.add_argument(
@@ -2300,10 +2908,22 @@ def main():
         "--notes", type=str, default="", help="Optional notes for this backtest run"
     )
     parser.add_argument(
+        "--initial-capital",
+        type=float,
+        default=None,
+        help="Override initial capital for stock-replacement backtests",
+    )
+    parser.add_argument(
         "--underlying",
         type=str,
         default=None,
         help="Underlying ticker for validate-polygon (default: SPY)",
+    )
+    parser.add_argument(
+        "--variants",
+        type=str,
+        default=None,
+        help="Comma-separated variants for intraday-sweep-profitability",
     )
     parser.add_argument(
         "--train-days",
@@ -2341,6 +2961,11 @@ def main():
         help="Promote best passing sweep variant in strategy catalog",
     )
     parser.add_argument(
+        "--force-rerun",
+        action="store_true",
+        help="Force rerun even when a matching backtest already exists",
+    )
+    parser.add_argument(
         "--no-promote-pass",
         dest="promote_pass",
         action="store_false",
@@ -2362,6 +2987,7 @@ def main():
         "intraday-report": cmd_intraday_report,
         "backtest-walkforward": cmd_backtest_walkforward,
         "intraday-sweep-validate": cmd_intraday_sweep_validate,
+        "intraday-sweep-profitability": cmd_intraday_sweep_profitability,
         "validate-polygon": cmd_validate_polygon,
     }
 

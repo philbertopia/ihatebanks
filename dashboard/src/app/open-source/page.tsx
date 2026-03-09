@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-const GITHUB_URL = "https://github.com/YOUR_USERNAME/i-hate-banks";
+const GITHUB_URL = "https://github.com/philbertopia/ihatebanks";
 
 const included = [
   {
@@ -30,7 +30,7 @@ const steps = [
   {
     n: "01",
     title: "Clone the repository",
-    code: `git clone ${GITHUB_URL}.git\ncd i-hate-banks`,
+    code: `git clone ${GITHUB_URL}.git\ncd ihatebanks`,
   },
   {
     n: "02",
@@ -69,7 +69,7 @@ const commands = [
   { cmd: "python main.py stats", desc: "Show aggregate P/L, win rate, and trade history from the local database" },
 ];
 
-const repoMap = `i-hate-banks/
+const repoMap = `ihatebanks/
 ├── main.py              ← Start here. All CLI commands live in this file.
 ├── server.py            ← FastAPI server (used with live dashboard backend)
 ├── requirements.txt     ← Python dependencies

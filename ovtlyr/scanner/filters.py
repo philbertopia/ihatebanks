@@ -13,6 +13,19 @@ from ovtlyr.utils.time_utils import days_to_expiration, get_third_friday, is_fin
 logger = logging.getLogger(__name__)
 
 
+def _clamp01(value: float) -> float:
+    return max(0.0, min(float(value), 1.0))
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 # ──────────────────────────────────────────────
 #  Individual filter functions
 # ──────────────────────────────────────────────
@@ -47,7 +60,15 @@ def passes_open_interest_filter(
         return not require
 
 
-def passes_spread_filter(spread_pct: float, max_spread_pct: float = 0.10) -> bool:
+def passes_spread_filter(
+    spread_pct: float,
+    max_spread_pct: float = 0.10,
+    spread_abs: float | None = None,
+    max_spread_abs: float | None = None,
+) -> bool:
+    if max_spread_abs is not None and spread_abs is not None:
+        if spread_abs > max_spread_abs:
+            return False
     return spread_pct <= max_spread_pct
 
 
@@ -121,6 +142,95 @@ def score_csp_candidate(data: Dict[str, Any], target_delta: float = -0.30) -> fl
     return round(delta_score + credit_score + oi_score + spread_score, 2)
 
 
+def credit_spread_setup_score(data: Dict[str, Any]) -> float:
+    """
+    State-aware setup score for premium-selling swing entries.
+
+    Components:
+      25% - regime alignment
+      20% - 3-day extension quality
+      15% - RSI quality
+      15% - IV / realized-vol regime fit
+      15% - breadth fit
+      10% - execution quality
+    """
+    side = str(data.get("side", "")).lower()
+    regime = str(data.get("regime", "")).lower()
+    ret3 = _safe_float(data.get("ret3"), 0.0)
+    rsi14 = _safe_float(data.get("rsi14"), 50.0)
+    iv_percentile = _safe_float(data.get("iv_percentile"), 50.0)
+    breadth_pct = _safe_float(data.get("breadth_pct"), 50.0)
+    execution_quality = _clamp01(_safe_float(data.get("execution_quality"), 0.5))
+
+    if side == "put":
+        regime_alignment = 1.0 if regime == "bull" else 0.0
+        extension_quality = _clamp01(1.0 - abs(ret3 - (-0.0225)) / 0.0275)
+        rsi_quality = _clamp01(1.0 - abs(rsi14 - 42.0) / 18.0)
+        iv_fit = _clamp01((iv_percentile - 20.0) / 60.0)
+        breadth_fit = _clamp01((breadth_pct - 45.0) / 35.0)
+    else:
+        regime_alignment = 1.0 if regime == "bear" else (0.8 if regime == "neutral" else 0.0)
+        extension_quality = _clamp01(1.0 - abs(ret3 - 0.0225) / 0.0275)
+        rsi_quality = _clamp01(1.0 - abs(rsi14 - 62.0) / 18.0)
+        iv_fit = _clamp01((iv_percentile - 30.0) / 55.0)
+        if regime == "neutral":
+            breadth_fit = _clamp01(1.0 - abs(breadth_pct - 50.0) / 20.0)
+        else:
+            breadth_fit = _clamp01((60.0 - breadth_pct) / 30.0)
+
+    score = (
+        (regime_alignment * 25.0)
+        + (extension_quality * 20.0)
+        + (rsi_quality * 15.0)
+        + (iv_fit * 15.0)
+        + (breadth_fit * 15.0)
+        + (execution_quality * 10.0)
+    )
+    return round(score, 2)
+
+
+def convex_swing_setup_score(data: Dict[str, Any]) -> float:
+    """
+    State-aware setup score for low-IV convex swing entries.
+
+    Components:
+      25% - bull regime alignment
+      20% - pullback/breakout quality
+      15% - RSI quality
+      15% - low-IV fit
+      15% - breadth fit
+      10% - execution quality
+    """
+    style = str(data.get("style", "")).lower()
+    regime = str(data.get("regime", "")).lower()
+    ret3 = _safe_float(data.get("ret3"), 0.0)
+    ret5 = _safe_float(data.get("ret5"), 0.0)
+    rsi14 = _safe_float(data.get("rsi14"), 50.0)
+    iv_percentile = _safe_float(data.get("iv_percentile"), 50.0)
+    breadth_pct = _safe_float(data.get("breadth_pct"), 50.0)
+    execution_quality = _clamp01(_safe_float(data.get("execution_quality"), 0.5))
+
+    regime_alignment = 1.0 if regime == "bull" else 0.0
+    if style == "breakout":
+        extension_quality = _clamp01(1.0 - abs(ret5 - 0.045) / 0.035)
+        rsi_quality = _clamp01(1.0 - abs(rsi14 - 63.0) / 17.0)
+    else:
+        extension_quality = _clamp01(1.0 - abs(ret3 - (-0.03)) / 0.025)
+        rsi_quality = _clamp01(1.0 - abs(rsi14 - 43.0) / 16.0)
+    iv_fit = _clamp01((35.0 - iv_percentile) / 35.0)
+    breadth_fit = _clamp01((breadth_pct - 50.0) / 30.0)
+
+    score = (
+        (regime_alignment * 25.0)
+        + (extension_quality * 20.0)
+        + (rsi_quality * 15.0)
+        + (iv_fit * 15.0)
+        + (breadth_fit * 15.0)
+        + (execution_quality * 10.0)
+    )
+    return round(score, 2)
+
+
 # ──────────────────────────────────────────────
 #  Master filter
 # ──────────────────────────────────────────────
@@ -151,6 +261,7 @@ def filter_candidates(
     min_oi = strategy.get("min_open_interest", 500)
     require_oi = strategy.get("require_open_interest", False)
     max_spread_pct = strategy.get("max_spread_pct", 0.10)
+    max_spread_abs = strategy.get("max_spread_abs")
     option_type = strategy.get("option_type", "call")
     min_dte = int(strategy.get("min_dte", 0) or 0)
     max_dte = int(strategy.get("max_dte", 10_000) or 10_000)
@@ -212,6 +323,7 @@ def filter_candidates(
         intrinsic = compute_intrinsic_value(opt_type, underlying_price, strike)
         extrinsic = compute_extrinsic_value(ask, intrinsic)
         ext_pct = compute_extrinsic_pct(extrinsic, ask)
+        spread_abs = max(ask - bid, 0.0)
         spread_pct = compute_spread_pct(bid, ask)
 
         # Apply filters
@@ -221,7 +333,12 @@ def filter_candidates(
             continue
         if not passes_open_interest_filter(oi, min_oi, require=require_oi):
             continue
-        if not passes_spread_filter(spread_pct, max_spread_pct):
+        if not passes_spread_filter(
+            spread_pct,
+            max_spread_pct,
+            spread_abs=spread_abs,
+            max_spread_abs=max_spread_abs,
+        ):
             continue
 
         candidate = {
@@ -230,11 +347,19 @@ def filter_candidates(
             "intrinsic_value": round(intrinsic, 4),
             "extrinsic_value": round(extrinsic, 4),
             "extrinsic_pct": round(ext_pct, 4),
+            "spread_abs": round(spread_abs, 4),
             "spread_pct": round(spread_pct, 4),
             "underlying_price": underlying_price,
         }
         strategy_type = strategy.get("strategy_type", "stock_replacement")
-        if strategy_type == "csp":
+        setup_score_model = str(strategy.get("setup_score_model", "") or "").lower()
+        if setup_score_model == "credit_spread":
+            candidate["setup_score"] = credit_spread_setup_score(candidate)
+            candidate["score"] = candidate["setup_score"]
+        elif setup_score_model == "convex_swing":
+            candidate["setup_score"] = convex_swing_setup_score(candidate)
+            candidate["score"] = candidate["setup_score"]
+        elif strategy_type == "csp":
             candidate["score"] = score_csp_candidate(candidate, target_delta)
         else:
             candidate["score"] = score_candidate(candidate)

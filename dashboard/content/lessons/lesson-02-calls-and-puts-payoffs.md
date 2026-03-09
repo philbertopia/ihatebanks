@@ -81,6 +81,13 @@ You pay a premium. In return, you profit if the stock rises above your strike pr
 
 Breakeven is $153. Below that, you lose up to $300. Above that, profit is theoretically unlimited.
 
+This is why viral stock-versus-call examples need to be read carefully. They are
+useful for showing leverage, but they often overemphasize the upside and
+understate how often a long call can still lose 100% of premium. See
+[How long-call leverage really works](/education/articles/how-long-call-leverage-really-works)
+for a corrected worked example and a comparison with this site's premium-selling
+framework.
+
 ### Selling a call (short call)
 
 You collect a premium upfront. In return, you're obligated to sell 100 shares at the strike if the buyer exercises.
@@ -168,5 +175,7 @@ Sell a cash-secured put. If assigned (stock falls below the strike at expiration
 ---
 
 ## Apply it
+
+Then read [How long-call leverage really works](/education/articles/how-long-call-leverage-really-works) and compare the payoff shape of a speculative long call with the payoff shape of the site's defined-risk premium-selling strategies.
 
 Open the [Strategies](/strategies) page and look at the **Put Credit Spread** family. Notice the **win rate** metric — this is the percentage of trades where the stock expired above the short put strike. Compare it to the **max drawdown**. That tension between high win rate and occasional large losses is the defining tradeoff every short-premium seller manages. The strategies on this site are designed to keep that drawdown bounded while letting the win rate compound over time.

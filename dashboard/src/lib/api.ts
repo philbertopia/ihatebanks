@@ -15,6 +15,7 @@ const STATIC_MAP: Record<string, string> = {
   "/stats/backtest/catalog": "/data/catalog.json",
   "/stats/backtest/walkforward": "/data/walkforward.json",
   "/stats/backtest/walkforward/runs": "/data/walkforward_runs.json",
+  "/stats/research/credit-spreads-10y": "/data/research_10y_credit_spreads.json",
 };
 
 const fetcher = async (url: string) => {
@@ -167,6 +168,74 @@ export interface MonthlyReturnPoint {
   return_pct: number;
 }
 
+export interface ResearchFilledInterval {
+  start: string;
+  end: string;
+}
+
+export interface Research10YRankingRow {
+  strategy_id: string;
+  strategy_name: string;
+  family_label: string;
+  variant: string;
+  strategy_key: string;
+  pass_validation: boolean;
+  avg_oos_sharpe_ratio: number;
+  avg_oos_max_drawdown_pct: number;
+  avg_oos_total_return_pct: number;
+  total_return_pct: number;
+  sharpe_ratio: number;
+  max_drawdown_pct: number;
+  total_trades: number;
+  win_rate: number;
+  sample_warning: boolean;
+  sample_warning_reason?: string | null;
+  rank: number;
+}
+
+export interface Research10YVariant {
+  strategy_id: string;
+  strategy_name: string;
+  family_label: string;
+  variant: string;
+  strategy_key: string;
+  sample_warning: boolean;
+  sample_warning_reason?: string | null;
+  full_period: {
+    metrics: BacktestMetrics;
+    monthly_returns: MonthlyReturnPoint[];
+  };
+  walkforward_summary: OosSummary;
+  walkforward_windows: WalkforwardWindowRow[];
+}
+
+export interface Research10YFamily {
+  strategy_id: string;
+  strategy_name: string;
+  family_label: string;
+  covered_variants: string[];
+  leader?: Research10YRankingRow | null;
+  practical_leader?: Research10YRankingRow | null;
+  ranking: Research10YRankingRow[];
+}
+
+export interface CreditSpread10YResearch {
+  generated_at: string;
+  period: { start: string; end: string };
+  train_days: number;
+  test_days: number;
+  step_days: number;
+  trading_days: number;
+  symbols: string[];
+  data_note: string;
+  filled_intervals: ResearchFilledInterval[];
+  sample_warning_trade_threshold: number;
+  families: Research10YFamily[];
+  variants: Research10YVariant[];
+  variants_by_key: Record<string, Research10YVariant>;
+  covered_strategy_keys: string[];
+}
+
 export interface BacktestSeries {
   equity_curve: number[];
   drawdown_curve?: number[];
@@ -248,6 +317,7 @@ export interface BacktestResults {
   strategy_id?: string;
   strategy_name?: string;
   variant?: string;
+  initial_capital?: number | null;
   engine_type?: string;
   assumptions_mode?: AssumptionsMode | string;
   strategy_parameters?: Record<string, unknown>;
@@ -289,6 +359,7 @@ export interface BacktestRun {
   strategy_id: string;
   strategy_name: string;
   variant: string;
+  initial_capital?: number | null;
   engine_type?: string;
   assumptions_mode?: AssumptionsMode | string;
   strategy_parameters?: Record<string, unknown>;
@@ -329,6 +400,7 @@ export interface BacktestStrategyComparison {
   strategy_id: string;
   strategy_name: string;
   variant: string;
+  initial_capital?: number | null;
   engine_type?: string;
   assumptions_mode?: AssumptionsMode | string;
   universe_profile?: string;
@@ -381,6 +453,7 @@ export interface WalkforwardRun {
   strategy_id: string;
   strategy_name: string;
   variant: string;
+  initial_capital?: number | null;
   universe_profile?: string;
   universe_size?: number;
   universe?: string;
@@ -416,6 +489,8 @@ export interface StrategyCatalogEntry {
   variant: string;
   status: "active" | "planned" | "retired" | string;
   champion?: boolean;
+  portfolio_role?: "core" | "supporting" | "benchmark" | "research" | string;
+  portfolio_group?: string;
   universe_note?: string;
   description: string;
   hypothesis: string;
@@ -496,6 +571,7 @@ export function useWalkforwardSummary() {
     strategy_id: string;
     strategy_name: string;
     variant: string;
+    initial_capital?: number | null;
     universe_profile?: string;
     generated_at: string;
     oos_summary: OosSummary;
@@ -504,6 +580,10 @@ export function useWalkforwardSummary() {
 
 export function useWalkforwardRuns() {
   return useSWR<WalkforwardRun[]>(`${BASE}/stats/backtest/walkforward/runs`, fetcher);
+}
+
+export function useCreditSpread10YResearch() {
+  return useSWR<CreditSpread10YResearch>(`${BASE}/stats/research/credit-spreads-10y`, fetcher);
 }
 
 // ── Helpers ───────────────────────────────────────────────────

@@ -68,6 +68,10 @@ To size this correctly, decide what percentage of your account you will risk per
 
 **Example:** $50,000 account, 2% risk limit per trade = $1,000 max risk per position. You could trade 2 contracts of the above spread ($350 x 2 = $700 risk, under the $1,000 limit).
 
+Small-account traders often misunderstand this when buying short-dated calls. The premium is capped, but the position can still be account-lethal if it is sized like a lottery ticket instead of a risk budget. [How long-call leverage really works](/education/articles/how-long-call-leverage-really-works) shows why "limited loss" does not mean "safe sizing."
+
+The same logic applies to "small-account" spread examples. A trade that requires only `$700` of buying power in a `$1,000` account is not conservative; it is risking most of the account on one position. [Small-account options: capital efficiency versus real risk](/education/articles/small-account-options-capital-efficiency-vs-risk) reframes that distinction.
+
 ### Why sizing matters more than win rate
 
 A strategy with a 75% win rate but terrible sizing can still go bankrupt. If you risk 20% of your account on each trade, a streak of 4 losses (which will happen in any high-win-rate strategy eventually) destroys 60%+ of your account. Recovery from a 60% drawdown requires a 150% gain just to break even.
@@ -99,7 +103,7 @@ Credit spreads have a natural tendency: when the stock moves through your short 
 
 The standard discipline:
 - **Profit target:** Close at 50% of max profit (premium collected). This exits at the steepest part of the theta curve while avoiding gamma risk near expiry.
-- **Loss limit:** Close at 2x the premium received. If you collected $1.50, close if the position reaches a $3.00 loss. This prevents small losers from becoming catastrophic ones.
+- **Loss limit:** Close at 2x the premium received. If you collected $1.50, close if the position price reaches $3.00 (a $1.50 net loss). This prevents small losers from becoming catastrophic ones.
 
 **Example:** You collect $1.50 on a spread. Your profit target is $0.75 debit to close. Your stop loss is $3.00 debit to close. The asymmetry is intentional — most positions reach the profit target, and the stop loss caps the damage on the minority that go wrong.
 
@@ -131,5 +135,7 @@ The strategies on this site include kill switch parameters in their configuratio
 ---
 
 ## Apply it
+
+Then read [How long-call leverage really works](/education/articles/how-long-call-leverage-really-works) and compare a defined-risk premium-selling position with a short-dated long call that can still lose 100% of premium.
 
 Open any strategy's detail page in the [Strategies](/strategies) section and find the **max drawdown** metric. Now calculate: if you traded this strategy at 1% risk per trade with a portfolio heat cap of 8%, what is the worst-case dollar loss from the max drawdown period? Compare that to a scenario where you traded without sizing limits. The difference illustrates why position sizing is not optional — it is the feature that makes the strategy survivable.

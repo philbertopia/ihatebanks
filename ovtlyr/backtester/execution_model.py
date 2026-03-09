@@ -74,6 +74,82 @@ def partial_fill_ratio(
     return max(0.0, min(ratio, 1.0))
 
 
+# -----------------------------------------------------------------------------
+# SPX 0DTE short put spread fill model (credit spread: sell spread = receive credit)
+# -----------------------------------------------------------------------------
+
+FillMode = str  # "conservative" | "base" | "optimistic"
+
+
+def spread_fill_credit_entry(
+    short_put_bid: float,
+    short_put_ask: float,
+    long_put_bid: float,
+    long_put_ask: float,
+    fill_mode: str = "base",
+    base_pct_of_spread: float = 0.15,
+    spread_multiplier: float = 1.0,
+) -> float:
+    """
+    Credit received when selling the put spread (short put at short_*, long put at long_*).
+    Conservative = worst leg (short at bid, long at ask). Optimistic = mid. Base = mid - pct of spread.
+    spread_multiplier: apply to effective spread (e.g. 1.5-3x in fast markets).
+    """
+    short_bid = max(float(short_put_bid), 0.0)
+    short_ask = max(float(short_put_ask), short_bid + 1e-6)
+    long_bid = max(float(long_put_bid), 0.0)
+    long_ask = max(float(long_put_ask), long_bid + 1e-6)
+    # Worst credit (conservative): we receive short bid, pay long ask
+    worst_credit = short_bid - long_ask
+    # Best credit: we receive short ask, pay long bid (theoretical best)
+    best_credit = short_ask - long_bid
+    mid_short = (short_bid + short_ask) / 2.0
+    mid_long = (long_bid + long_ask) / 2.0
+    mid_credit = mid_short - mid_long
+    spread_width = max((best_credit - worst_credit) * spread_multiplier, 0.0)
+    mode = str(fill_mode or "base").lower()
+    if mode == "conservative":
+        return round(worst_credit, 4)
+    if mode == "optimistic":
+        return round(mid_credit, 4)
+    # base: mid minus fraction of spread (worse fill)
+    pct = max(0.0, min(1.0, float(base_pct_of_spread)))
+    return round(max(worst_credit, mid_credit - pct * spread_width), 4)
+
+
+def spread_fill_debit_exit(
+    short_put_bid: float,
+    short_put_ask: float,
+    long_put_bid: float,
+    long_put_ask: float,
+    fill_mode: str = "base",
+    base_pct_of_spread: float = 0.15,
+    spread_multiplier: float = 1.0,
+) -> float:
+    """
+    Debit paid when buying back the put spread (buy short, sell long).
+    Conservative = worst (pay short ask, receive long bid). Optimistic = mid. Base = mid + pct of spread.
+    """
+    short_bid = max(float(short_put_bid), 0.0)
+    short_ask = max(float(short_put_ask), short_bid + 1e-6)
+    long_bid = max(float(long_put_bid), 0.0)
+    long_ask = max(float(long_put_ask), long_bid + 1e-6)
+    # Worst debit: pay short ask, receive long bid
+    worst_debit = short_ask - long_bid
+    best_debit = short_bid - long_ask
+    mid_short = (short_bid + short_ask) / 2.0
+    mid_long = (long_bid + long_ask) / 2.0
+    mid_debit = mid_short - mid_long
+    spread_width = max((worst_debit - best_debit) * spread_multiplier, 0.0)
+    mode = str(fill_mode or "base").lower()
+    if mode == "conservative":
+        return round(worst_debit, 4)
+    if mode == "optimistic":
+        return round(mid_debit, 4)
+    pct = max(0.0, min(1.0, float(base_pct_of_spread)))
+    return round(min(worst_debit, mid_debit + pct * spread_width), 4)
+
+
 def summarize_execution_realism(
     slippage_bps: List[float],
     spread_cost_total: float,

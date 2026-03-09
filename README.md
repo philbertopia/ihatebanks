@@ -107,6 +107,15 @@ python scripts/export_dashboard_data.py
 
 This writes JSON files consumed by the dashboard from `dashboard/public/data`.
 
+### SPX 0DTE short put spread backtest (research)
+
+The SPX 0DTE engine runs only on SPXW expiry days (calendar in `ovtlyr/backtester/spx_expiry.py`) and uses a **proxy path** by default: daily option cache (e.g. SPY) and simulated intraday exit. For realistic intraday NBBO you would need Cboe DataShop-style data and the optional intraday loader.
+
+- Single run: `python main.py backtest --strategy-id spx_0dte_put_spread --variant balanced --start 2022-01-01 --end 2024-12-31`
+- Parameter sweep (writes to `data/reports/`): `python scripts/run_spx_0dte_research.py --start 2022-01-01`
+
+SPX index options are Section 1256 (60/40 tax treatment); backtest reports are pre-tax unless you add an after-tax layer.
+
 ### Create a new educational article
 
 ```bash

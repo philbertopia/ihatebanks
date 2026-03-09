@@ -58,14 +58,24 @@ def run_wheel_backtest(
     closed_trades = []
     equity_curve = [cash]
 
-    trading_days = sorted(data["date"].unique())
+    data = data.copy()
+    data["date"] = data["date"].astype(str)
+    day_groups = {str(day): frame for day, frame in data.groupby("date", sort=True)}
+
+    trading_days = sorted(day_groups.keys())
     trading_days = [
         d for d in trading_days if start_date <= date.fromisoformat(str(d)) <= end_date
     ]
 
     for day_str in trading_days:
         today = date.fromisoformat(str(day_str))
-        day_data = data[data["date"] == day_str]
+        day_data = day_groups.get(day_str)
+        if day_data is None or day_data.empty:
+            equity_curve.append(cash)
+            continue
+        symbol_groups = {
+            str(symbol): frame for symbol, frame in day_data.groupby("underlying", sort=False)
+        }
 
         # === Handle CSP Expirations ===
         expired_csp = []
@@ -77,8 +87,8 @@ def run_wheel_backtest(
 
             if exp <= today:
                 # Get underlying price
-                sym_data = day_data[day_data["underlying"] == pos["underlying"]]
-                if sym_data.empty:
+                sym_data = symbol_groups.get(str(pos["underlying"]))
+                if sym_data is None or sym_data.empty:
                     continue
                 S = float(sym_data["underlying_price"].iloc[0])
 
@@ -134,8 +144,8 @@ def run_wheel_backtest(
                 continue
 
             if exp <= today:
-                sym_data = day_data[day_data["underlying"] == pos["underlying"]]
-                if sym_data.empty:
+                sym_data = symbol_groups.get(str(pos["underlying"]))
+                if sym_data is None or sym_data.empty:
                     continue
                 S = float(sym_data["underlying_price"].iloc[0])
 
@@ -200,7 +210,7 @@ def run_wheel_backtest(
             seen_underlyings.update(p["underlying"] for p in stock_positions)
             seen_underlyings.update(p["underlying"] for p in cc_positions)
 
-            for underlying in day_data["underlying"].unique():
+            for underlying, sym_data in symbol_groups.items():
                 if underlying in seen_underlyings:
                     continue
                 if len(csp_positions) >= max_csp:
@@ -213,10 +223,6 @@ def run_wheel_backtest(
                     )
                     if has_stock:
                         continue
-
-                sym_data = day_data[day_data["underlying"] == underlying]
-                if sym_data.empty:
-                    continue
 
                 # Filter for puts with target delta
                 puts = sym_data[sym_data["option_type"] == "put"]
@@ -267,8 +273,8 @@ def run_wheel_backtest(
                 if len(cc_positions) >= max_cc:
                     break
 
-                sym_data = day_data[day_data["underlying"] == underlying]
-                if sym_data.empty:
+                sym_data = symbol_groups.get(str(underlying))
+                if sym_data is None or sym_data.empty:
                     continue
 
                 # Filter for calls with target delta

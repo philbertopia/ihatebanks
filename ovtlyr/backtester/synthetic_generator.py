@@ -18,8 +18,10 @@ import pandas as pd
 import yfinance as yf
 from scipy.stats import norm
 
+from ovtlyr.backtester.spx_expiry import has_same_day_expiry
 from ovtlyr.utils.time_utils import (
     get_monthly_expirations,
+    get_weekly_expirations,
     days_to_expiration,
     is_market_day,
 )
@@ -36,7 +38,7 @@ RISK_FREE_RATE = 0.05  # 5% annual, approximate
 SPREAD_FACTOR = 0.01  # 1% of option price for synthetic bid/ask spread
 MIN_DELTA_CALL = 0.60
 MAX_DELTA_CALL = 0.95
-MIN_DELTA_PUT = -0.40
+MIN_DELTA_PUT = -0.70   # expanded to include ITM puts (delta -0.55 to -0.70)
 MAX_DELTA_PUT = -0.10
 # Strike grid: percentage of spot price, covering deep ITM calls
 STRIKE_PCTS_CALL = [
@@ -46,8 +48,17 @@ STRIKE_PCTS_CALL = [
 STRIKE_PCTS_OTM_CALL = [i / 100 for i in range(101, 116, 1)]  # 101% to 115% of spot
 MIN_DELTA_OTM_CALL = 0.10  # OTM calls have lower delta (10-45%)
 MAX_DELTA_OTM_CALL = 0.45
-# Strike grid for puts: percentage of spot price, covering OTM puts (for CSP)
-STRIKE_PCTS_PUT = [i / 100 for i in range(85, 105, 1)]  # 85% to 104% of spot (for puts)
+# Strike grid for puts: OTM puts (< spot) for CSP + ITM puts (> spot) for directional buys
+STRIKE_PCTS_PUT = [i / 100 for i in range(85, 120, 1)]  # 85% to 119% of spot
+# Finer grid for 0DTE puts: 85% to 99.5% of spot (short + long put for spread)
+STRIKE_PCTS_PUT_0DTE = [i / 1000.0 for i in range(850, 1000, 5)]  # 0.85, 0.855, ..., 0.995
+# 0DTE put delta range: short put ~5–25 delta (e.g. -0.25 to -0.05); long put deeper OTM (delta near 0)
+# Include up to 0 so the long leg of the spread is in the chain
+MIN_DELTA_PUT_0DTE = -0.70
+MAX_DELTA_PUT_0DTE = 0.0
+# Time to expiry for same-day options (hours to 4pm / 24 / 365)
+HOURS_TO_CLOSE_0DTE = 6.0
+T_0DTE_YEARS = (HOURS_TO_CLOSE_0DTE / 24.0) / 365.0
 
 
 def _bsm_call(S: float, K: float, T: float, r: float, sigma: float) -> Dict[str, float]:
@@ -250,16 +261,25 @@ class SyntheticGenerator:
             return []
 
         sigma = self._rolling_volatility(price_series, today)
-        expirations = get_monthly_expirations(
-            min_dte=self.min_dte, max_dte=self.max_dte, today=today
+        # Weekly expirations for short-DTE range (swing strategies need 7-30 DTE)
+        short_expiries = get_weekly_expirations(min_dte=7, max_dte=30, today=today)
+        # Monthly expirations for longer DTE (better liquidity model for longer holds)
+        long_expiries = get_monthly_expirations(
+            min_dte=30, max_dte=self.max_dte, today=today
         )
+        expirations = sorted(set(short_expiries + long_expiries))
+        # Same-day (0 DTE) expiry on SPXW expiry days for SPX 0DTE backtest
+        if has_same_day_expiry(today):
+            expirations = sorted(set(expirations + [today]))
 
         rows = []
 
         # Generate CALL options
         for expiry in expirations:
             dte = days_to_expiration(expiry, today)
-            T = dte / 365.0  # time to expiry in years
+            T = T_0DTE_YEARS if dte == 0 else (dte / 365.0)
+            if T <= 0:
+                continue
 
             for strike_pct in STRIKE_PCTS_CALL:
                 K = round(S * strike_pct, 2)
@@ -310,7 +330,9 @@ class SyntheticGenerator:
         # Generate OTM CALL options (for call credit spreads — CCS strategy)
         for expiry in expirations:
             dte = days_to_expiration(expiry, today)
-            T = dte / 365.0
+            T = T_0DTE_YEARS if dte == 0 else (dte / 365.0)
+            if T <= 0:
+                continue
 
             for strike_pct in STRIKE_PCTS_OTM_CALL:
                 K = round(S * strike_pct, 2)
@@ -358,23 +380,30 @@ class SyntheticGenerator:
                     }
                 )
 
-        # Generate PUT options (for CSP strategy)
+        # Generate PUT options (for CSP strategy; 0DTE uses finer grid + 5-25 delta for SPX 0DTE engine)
         for expiry in expirations:
             dte = days_to_expiration(expiry, today)
-            T = dte / 365.0  # time to expiry in years
+            T = T_0DTE_YEARS if dte == 0 else (dte / 365.0)
+            if T <= 0:
+                continue
+            is_0dte = dte == 0
+            strike_pcts_put = STRIKE_PCTS_PUT_0DTE if is_0dte else STRIKE_PCTS_PUT
+            min_delta_put = MIN_DELTA_PUT_0DTE if is_0dte else MIN_DELTA_PUT
+            max_delta_put = MAX_DELTA_PUT_0DTE if is_0dte else MAX_DELTA_PUT
 
-            for strike_pct in STRIKE_PCTS_PUT:
+            for strike_pct in strike_pcts_put:
                 K = round(S * strike_pct, 2)
                 bsm = _bsm_put(S, K, T, RISK_FREE_RATE, sigma)
                 if bsm is None:
                     continue
 
                 delta = bsm["delta"]
-                if not (MIN_DELTA_PUT <= delta <= MAX_DELTA_PUT):
+                if not (min_delta_put <= delta <= max_delta_put):
                     continue
 
                 mid = bsm["price"]
-                half_spread = max(mid * SPREAD_FACTOR, 0.01)
+                spread_factor = SPREAD_FACTOR * 1.5 if is_0dte else SPREAD_FACTOR
+                half_spread = max(mid * spread_factor, 0.01)
                 ask = round(mid + half_spread, 2)
                 bid = round(mid - half_spread, 2)
                 bid = max(bid, 0.01)

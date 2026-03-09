@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   useBacktestStrategyComparison,
+  useCreditSpread10YResearch,
   useStrategyCatalog,
   type BacktestStrategyComparison,
 } from "@/lib/api";
@@ -12,6 +13,7 @@ const FAMILIES = [
   { key: "all", label: "All Strategies" },
   { key: "openclaw_put_credit_spread", label: "Put Credit Spread" },
   { key: "openclaw_call_credit_spread", label: "Call Credit Spread" },
+  { key: "research_small_account_options", label: "Small Account Research" },
   { key: "intraday_open_close_options", label: "Intraday O/C" },
   { key: "stock_replacement", label: "Stock Replacement" },
   { key: "_wheel", label: "Wheel" },
@@ -34,6 +36,7 @@ type SortKey = (typeof SORT_KEYS)[number]["key"];
 function strategyFamily(id: string, variant?: string): string {
   if (id.includes("call_credit_spread")) return "CCS";
   if (id.includes("put_credit_spread")) return "PCS";
+  if (id.includes("research_small_account_options")) return "Small Acct";
   if (id.includes("intraday_open_close_options")) return "Intraday";
   if (id.includes("stock_options")) return "Stock Opts";
   if (id.includes("tqqq_swing")) return "TQQQ";
@@ -49,6 +52,7 @@ function strategyFamily(id: string, variant?: string): string {
 function familyColor(id: string, variant?: string): string {
   if (id.includes("call_credit_spread")) return "bg-rose-900/50 text-rose-300 border-rose-700";
   if (id.includes("put_credit_spread")) return "bg-purple-900/50 text-purple-300 border-purple-700";
+  if (id.includes("research_small_account_options")) return "bg-emerald-900/50 text-emerald-300 border-emerald-700";
   if (id.includes("intraday_open_close_options")) return "bg-cyan-900/50 text-cyan-300 border-cyan-700";
   if (id.includes("stock_options")) return "bg-pink-900/50 text-pink-300 border-pink-700";
   if (id.includes("tqqq_swing")) return "bg-yellow-900/50 text-yellow-300 border-yellow-700";
@@ -65,6 +69,15 @@ function universeLabel(c: BacktestStrategyComparison): string {
   if (!c.universe_profile) return "—";
   const size = c.universe_size ? ` (${c.universe_size})` : "";
   return `${c.universe_profile}${size}`;
+}
+
+function capitalLabel(initialCapital: number | undefined | null): string | null {
+  if (initialCapital == null || !Number.isFinite(initialCapital)) return null;
+  if (Math.abs(initialCapital - 100000) < 0.005) return null;
+  return `Cap $${initialCapital.toLocaleString("en-US", {
+    minimumFractionDigits: Number.isInteger(initialCapital) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function sanitizeDrawdown(value: number | undefined | null): number | null {
@@ -129,9 +142,22 @@ function WinRateCell({ value }: { value: number | undefined | null }) {
   return <span className={`font-mono ${color}`}>{value.toFixed(1)}%</span>;
 }
 
+function strategyHref(strategyId: string, variant: string, initialCapital?: number | null) {
+  return {
+    pathname: `/strategies/${variant}`,
+    query: {
+      strategy_id: strategyId,
+      ...(initialCapital != null && Number.isFinite(initialCapital)
+        ? { initial_capital: String(initialCapital) }
+        : {}),
+    },
+  };
+}
+
 export default function StrategiesPage() {
   const { data: comparisons, isLoading, error } = useBacktestStrategyComparison();
   const { data: catalog } = useStrategyCatalog();
+  const { data: research10y } = useCreditSpread10YResearch();
   const [family, setFamily] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("oosSharpe");
   const [sortAsc, setSortAsc] = useState(false);
@@ -225,6 +251,11 @@ export default function StrategiesPage() {
     return sorted[0] ?? null;
   }, [comparisons, catalog, sorted]);
 
+  const researchCoverage = useMemo(
+    () => new Set(research10y?.covered_strategy_keys ?? []),
+    [research10y]
+  );
+
   function handleSort(key: SortKey) {
     if (sortKey === key) {
       setSortAsc(!sortAsc);
@@ -250,7 +281,7 @@ export default function StrategiesPage() {
           href="/backtest"
           className="text-xs text-pink-300 hover:text-pink-200 border border-pink-800 rounded px-3 py-1.5"
         >
-          Detailed charts →
+          Detailed charts {"->"}
         </Link>
       </div>
 
@@ -271,7 +302,6 @@ export default function StrategiesPage() {
         <div className="bg-gradient-to-r from-yellow-900/40 to-amber-900/20 border border-yellow-700/60 rounded-xl p-5">
           <div className="flex items-start gap-4 flex-wrap">
             <div className="flex items-center gap-2 shrink-0">
-              <span className="text-2xl">👑</span>
               <span className="text-yellow-400 font-bold text-sm uppercase tracking-wider">Champion Strategy</span>
             </div>
             <div className="flex-1 min-w-0">
@@ -281,6 +311,11 @@ export default function StrategiesPage() {
                 <span className={`text-[11px] px-2 py-0.5 rounded border ${familyColor(champion.strategy_id, champion.variant)}`}>
                   {strategyFamily(champion.strategy_id, champion.variant)}
                 </span>
+                {researchCoverage.has(`${champion.strategy_id}|${champion.variant}`) && (
+                  <span className="text-[11px] px-2 py-0.5 rounded border bg-sky-900/40 text-sky-300 border-sky-700">
+                    10Y Research
+                  </span>
+                )}
               </div>
               <div className="flex gap-5 flex-wrap text-sm mt-2">
                 <div>
@@ -315,7 +350,11 @@ export default function StrategiesPage() {
               )}
             </div>
             <Link
-              href={`/strategies/${champion.variant}`}
+              href={strategyHref(
+                champion.strategy_id,
+                champion.variant,
+                champion.initial_capital
+              )}
               className="shrink-0 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-black text-xs font-bold rounded-lg transition-colors"
             >
               View Charts →
@@ -331,7 +370,7 @@ export default function StrategiesPage() {
             const isChampion = catalogMap.get(`${c.strategy_id}|${c.variant}`)?.champion === true;
             return (
               <div
-                key={c.strategy_id + c.variant}
+                key={`${c.strategy_id}-${c.variant}-${c.initial_capital ?? "default"}`}
                 className={`rounded-xl p-4 border ${
                   isChampion
                     ? "bg-yellow-900/20 border-yellow-700/50"
@@ -344,6 +383,11 @@ export default function StrategiesPage() {
                   {!isChampion && (
                     <span className={`text-[10px] px-1.5 py-0.5 rounded border ${familyColor(c.strategy_id, c.variant)}`}>
                       {strategyFamily(c.strategy_id, c.variant)}
+                    </span>
+                  )}
+                  {researchCoverage.has(`${c.strategy_id}|${c.variant}`) && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded border bg-sky-900/40 text-sky-300 border-sky-700">
+                      10Y Research
                     </span>
                   )}
                 </div>
@@ -374,6 +418,7 @@ export default function StrategiesPage() {
                 {c.universe_profile && (
                   <p className="text-[10px] text-gray-500 mt-1 font-mono">
                     {universeLabel(c)}
+                    {capitalLabel(c.initial_capital) ? ` • ${capitalLabel(c.initial_capital)}` : ""}
                   </p>
                 )}
               </div>
@@ -476,15 +521,23 @@ export default function StrategiesPage() {
               {sorted.map((c, idx) => {
                 const isChampion = catalogMap.get(`${c.strategy_id}|${c.variant}`)?.champion === true;
                 return (
-                  <div key={`m-${c.strategy_id}-${c.variant}`} className="bg-gray-900 border border-gray-700 rounded-lg p-3">
+                  <div key={`m-${c.strategy_id}-${c.variant}-${c.initial_capital ?? "default"}`} className="bg-gray-900 border border-gray-700 rounded-lg p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
                           <RankBadge rank={idx + 1} isChampion={isChampion} />
                           <p className="text-white font-semibold leading-tight">{c.strategy_name}</p>
+                          {researchCoverage.has(`${c.strategy_id}|${c.variant}`) && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded border bg-sky-900/40 text-sky-300 border-sky-700">
+                              10Y Research
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-gray-500 font-mono mt-1">{c.variant}</p>
                         <p className="text-[11px] text-gray-400 mt-1">{universeLabel(c)}</p>
+                        {capitalLabel(c.initial_capital) && (
+                          <p className="text-[11px] text-gray-500">{capitalLabel(c.initial_capital)}</p>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className={`font-mono text-lg font-bold ${(c.latest_total_return_pct ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
@@ -499,7 +552,7 @@ export default function StrategiesPage() {
                       <span className={`text-xs font-semibold ${!c.has_oos_summary ? "text-gray-500" : c.oos_pass_validation ? "text-green-400" : "text-red-400"}`}>
                         {!c.has_oos_summary ? "OOS: N/A" : c.oos_pass_validation ? "OOS: PASS" : "OOS: FAIL"}
                       </span>
-                      <Link href={`/strategies/${c.variant}`} className="text-xs text-pink-300 underline underline-offset-2">
+                      <Link href={strategyHref(c.strategy_id, c.variant, c.initial_capital)} className="text-xs text-pink-300 underline underline-offset-2">
                         View Details →
                       </Link>
                     </div>
@@ -575,7 +628,7 @@ export default function StrategiesPage() {
                   const uNote = catalogMap.get(`${c.strategy_id}|${c.variant}`)?.universe_note;
                   return (
                     <tr
-                      key={c.strategy_id + c.variant}
+                      key={`${c.strategy_id}-${c.variant}-${c.initial_capital ?? "default"}`}
                       className={`transition-colors ${
                         isChampion ? "bg-yellow-900/10 hover:bg-yellow-900/20" : "hover:bg-gray-700/30"
                       }`}
@@ -587,7 +640,14 @@ export default function StrategiesPage() {
                         </div>
                       </td>
                       <td className="py-3 pr-4">
-                        <p className="text-white font-semibold text-sm leading-tight">{c.strategy_name}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-white font-semibold text-sm leading-tight">{c.strategy_name}</p>
+                          {researchCoverage.has(`${c.strategy_id}|${c.variant}`) && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded border bg-sky-900/40 text-sky-300 border-sky-700">
+                              10Y Research
+                            </span>
+                          )}
+                        </div>
                         <p className="text-gray-500 font-mono text-[11px]">{c.variant}</p>
                       </td>
                       <td className="py-3 pr-4">
@@ -597,6 +657,9 @@ export default function StrategiesPage() {
                       </td>
                       <td className="py-3 pr-4">
                         <span className="text-xs font-mono text-gray-300">{universeLabel(c)}</span>
+                        {capitalLabel(c.initial_capital) && (
+                          <p className="text-[10px] text-gray-500 mt-0.5">{capitalLabel(c.initial_capital)}</p>
+                        )}
                         {uNote && (
                           <p className="text-[10px] text-gray-500 leading-tight mt-0.5 max-w-[180px]">{uNote}</p>
                         )}
@@ -639,7 +702,7 @@ export default function StrategiesPage() {
                       <td className="py-3 pr-4 text-gray-400 font-mono text-xs">{c.runs}</td>
                       <td className="py-3 pr-5">
                         <Link
-                          href={`/strategies/${c.variant}`}
+                          href={strategyHref(c.strategy_id, c.variant, c.initial_capital)}
                           className="text-xs text-pink-300 hover:text-pink-200 underline underline-offset-2"
                         >
                           View →

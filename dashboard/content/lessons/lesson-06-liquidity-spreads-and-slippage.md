@@ -112,6 +112,8 @@ Not all expirations are equally liquid. Monthly expirations — the third Friday
 
 Weekly expirations exist for major underlyings, but they typically have wider spreads, especially at OTM strikes. Quarterly and LEAPS expirations have even lower liquidity.
 
+That matters for small-account narratives too. A cheap-looking 0DTE SPY iron condor or a far-dated LEAPS call may fit the broker's buying-power rules while still giving up a meaningful share of expected edge to spread and slippage. [Small-account options: capital efficiency versus real risk](/education/articles/small-account-options-capital-efficiency-vs-risk) walks through that tradeoff directly.
+
 The strategies on this site use **monthly expirations** for this reason. The liquidity advantage compounds over hundreds of trades.
 
 ---
