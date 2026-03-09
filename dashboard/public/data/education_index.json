@@ -1,5 +1,37 @@
 [
   {
+    "type": "articles",
+    "slug": "credit-spread-10-year-research-coverage",
+    "title": "Credit spread 10-year research coverage",
+    "summary": "First-wave local 10-year research coverage for the strongest credit-spread families, including month-by-month results, gap-fill methodology, and the current leaders in regime, put-credit-spread, and call-credit-spread tests.",
+    "published_at": "2026-03-09",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "backtesting",
+      "options",
+      "research",
+      "regime-analysis"
+    ],
+    "estimated_minutes": 18
+  },
+  {
+    "type": "articles",
+    "slug": "research-index-swing-options-initial-sweep",
+    "title": "Research index swing options initial sweep",
+    "summary": "First two local sweeps of the new SPY/QQQ swing-hybrid family. A broader second pass improved raw return a bit, but the router still failed to produce meaningful PCS or CCS participation, so the family remains research-only and does not get a 10-year extension.",
+    "published_at": "2026-03-09",
+    "level": "intermediate",
+    "tags": [
+      "article",
+      "backtesting",
+      "options",
+      "swing-trading",
+      "research"
+    ],
+    "estimated_minutes": 12
+  },
+  {
     "type": "lessons",
     "slug": "lesson-13-swing-call-options",
     "title": "Swing call and put options",
@@ -79,7 +111,7 @@
     "type": "articles",
     "slug": "regime-credit-spread-10-year-comparison",
     "title": "Regime credit spread 10-year comparison",
-    "summary": "Local research note comparing all six regime-credit-spread variants over a continuous 2016-2025 extension built from the cache plus a filled SPY and QQQ price-history gap.",
+    "summary": "Local research note comparing all six regime-credit-spread variants over a continuous 2016-2025 extension, now positioned as one family inside the broader first-wave credit-spread 10-year research coverage.",
     "published_at": "2026-03-08",
     "level": "intermediate",
     "tags": [

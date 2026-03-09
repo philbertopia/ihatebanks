@@ -10,10 +10,13 @@ assumptions modes:
   - research_small_account_options
       (spy_iron_condor_proxy, msft_bull_call_spread,
        aapl_bull_put_45_21, aapl_long_call_low_iv)
+  - research_index_swing_options
+      (pullback_baseline_30_45, pullback_defensive_30_45,
+       pullback_baseline_45_60, pullback_defensive_45_60)
   - openclaw_regime_credit_spread
       (regime_balanced, regime_defensive, regime_legacy_defensive,
        regime_vix_baseline, regime_legacy_defensive_bear_only,
-       regime_vix_baseline_bear_only)
+       regime_vix_baseline_bear_only, timed_legacy_defensive_*)
   - openclaw_tqqq_swing (legacy_replica, realistic_priced)
   - openclaw_hybrid (legacy_replica, realistic_priced)
 """
@@ -25,6 +28,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 
 from ovtlyr.backtester.engine import BacktestEngine
@@ -58,6 +62,10 @@ CALL_CREDIT_SPREAD_MODES = {
     "ccs_baseline",
     "ccs_vix_regime",
     "ccs_defensive",
+    # Single-stock / multi-stock extensions (2026-03)
+    "single_stock_aapl",
+    "single_stock_nvda",
+    "multi_stock_basket",
 }
 REGIME_CREDIT_SPREAD_MODES = {
     "regime_balanced",
@@ -66,6 +74,14 @@ REGIME_CREDIT_SPREAD_MODES = {
     "regime_vix_baseline",
     "regime_legacy_defensive_bear_only",
     "regime_vix_baseline_bear_only",
+    "timed_legacy_defensive_40_7_r075",
+    "timed_legacy_defensive_40_10_r100",
+    "timed_legacy_defensive_50_10_r100",
+    "timed_legacy_defensive_60_10_r100",
+    "timed_legacy_defensive_50_14_r125",
+    "timed_legacy_defensive_bear_only_40_10_r100",
+    "timed_legacy_defensive_bear_only_50_10_r100",
+    "timed_legacy_defensive_bear_only_50_7_r075",
 }
 INTRADAY_MODES = {
     "baseline",
@@ -85,6 +101,16 @@ SMALL_ACCOUNT_RESEARCH_MODES = {
     "msft_bull_call_spread",
     "aapl_bull_put_45_21",
     "aapl_long_call_low_iv",
+}
+INDEX_SWING_RESEARCH_MODES = {
+    "pullback_baseline_30_45",
+    "pullback_defensive_30_45",
+    "pullback_baseline_45_60",
+    "pullback_defensive_45_60",
+    "pullback_baseline_30_45_v2",
+    "pullback_defensive_30_45_v2",
+    "pullback_baseline_45_60_v2",
+    "pullback_defensive_45_60_v2",
 }
 
 
@@ -251,6 +277,19 @@ def run_openclaw_variant(
             )
         return _with_execution_defaults(
             _run_research_small_account_options(
+                data=data,
+                start_date=start_date,
+                end_date=end_date,
+                assumptions_mode=assumptions_mode,
+            )
+        )
+    if strategy_id == "research_index_swing_options":
+        if assumptions_mode not in INDEX_SWING_RESEARCH_MODES:
+            raise ValueError(
+                f"Unsupported assumptions mode for {strategy_id}: {assumptions_mode}"
+            )
+        return _with_execution_defaults(
+            _run_research_index_swing_options(
                 data=data,
                 start_date=start_date,
                 end_date=end_date,
@@ -956,6 +995,63 @@ def _call_credit_params(mode: str) -> Dict[str, Any]:
             "target_annual_vol": 0.14,
             "max_symbol_notional_pct": 0.16,
         },
+        # ── Single-stock / multi-stock variants (2026-03) ────────────────────
+        # Higher-IV individual stocks generate more premium per trade.
+        # Use tighter strikes and wider spreads vs SPY/QQQ to manage idiosyncratic risk.
+        "single_stock_aapl": {
+            "risk_pct": 0.010,
+            "short_dist_pct": 0.035,   # 3.5% OTM (closer than SPY due to lower vol)
+            "width_pct": 0.050,
+            "credit_ratio": 0.33,
+            "dte_days": 35.0,
+            "take_profit_ratio": 0.50,
+            "stop_mult": 2.20,
+            "min_hold_days": 3.0,
+            "force_close_dte": 10.0,
+            "iv_low": 0.20,
+            "iv_high": 0.80,
+            "fee_per_contract": 3.0,
+            "max_qty": 3.0,
+            "target_annual_vol": 0.18,
+            "max_symbol_notional_pct": 0.40,
+            "allowed_symbols": ["AAPL"],
+        },
+        "single_stock_nvda": {
+            "risk_pct": 0.008,         # smaller per-trade risk — NVDA is high-vol
+            "short_dist_pct": 0.050,   # 5% OTM — wider because IV is ~3x SPY
+            "width_pct": 0.080,        # 8% wide spread
+            "credit_ratio": 0.33,
+            "dte_days": 35.0,
+            "take_profit_ratio": 0.50,
+            "stop_mult": 2.20,
+            "min_hold_days": 3.0,
+            "force_close_dte": 10.0,
+            "iv_low": 0.30,
+            "iv_high": 1.20,           # NVDA often > 80% IV — allow high end
+            "fee_per_contract": 3.0,
+            "max_qty": 2.0,
+            "target_annual_vol": 0.18,
+            "max_symbol_notional_pct": 0.40,
+            "allowed_symbols": ["NVDA"],
+        },
+        "multi_stock_basket": {
+            "risk_pct": 0.010,
+            "short_dist_pct": 0.040,   # 4% OTM across mixed-vol basket
+            "width_pct": 0.060,
+            "credit_ratio": 0.33,
+            "dte_days": 35.0,
+            "take_profit_ratio": 0.50,
+            "stop_mult": 2.20,
+            "min_hold_days": 3.0,
+            "force_close_dte": 10.0,
+            "iv_low": 0.18,
+            "iv_high": 1.00,
+            "fee_per_contract": 3.0,
+            "max_qty": 2.0,
+            "target_annual_vol": 0.18,
+            "max_symbol_notional_pct": 0.15,  # 4 stocks — lower per-stock cap
+            "allowed_symbols": ["AAPL", "MSFT", "NVDA", "JPM"],
+        },
     }
     if mode not in profiles:
         raise ValueError(f"Unsupported call-credit-spread mode: {mode}")
@@ -1007,9 +1103,155 @@ def _regime_credit_params(mode: str) -> Dict[str, Any]:
             "max_call_pct_above_ma50": 0.08,
         },
     }
+    def _timed_profile(
+        *,
+        take_profit_ratio: float,
+        force_close_dte: int,
+        risk_pct_scale: float,
+        bear_only: bool = False,
+    ) -> Dict[str, Any]:
+        return {
+            "bull_mode": "legacy_replica",
+            "bear_mode": "ccs_defensive",
+            "neutral_mode": "ccs_defensive",
+            "allow_neutral_call_entries": not bear_only,
+            "max_call_pct_above_ma50": 0.05,
+            "timing_enabled": True,
+            "timed_bear_only": bear_only,
+            "take_profit_ratio_override": take_profit_ratio,
+            "force_close_dte_override": force_close_dte,
+            "risk_pct_scale": risk_pct_scale,
+            "bull_pullback_return_min": -0.04,
+            "bull_pullback_return_max": -0.0075,
+            "bull_pullback_rsi_max": 50.0,
+            "bear_rally_fade_return_min": 0.0075,
+            "bear_rally_fade_return_max": 0.04,
+            "bear_rally_fade_rsi_min": 55.0,
+            "neutral_rally_fade_return_min": 0.01,
+            "neutral_rally_fade_return_max": 0.045,
+            "neutral_rally_fade_rsi_min": 58.0,
+            "neutral_close_vs_ma20_min_pct": 0.01,
+        }
+    profiles.update(
+        {
+            "timed_legacy_defensive_40_7_r075": _timed_profile(
+                take_profit_ratio=0.40,
+                force_close_dte=7,
+                risk_pct_scale=0.75,
+            ),
+            "timed_legacy_defensive_40_10_r100": _timed_profile(
+                take_profit_ratio=0.40,
+                force_close_dte=10,
+                risk_pct_scale=1.00,
+            ),
+            "timed_legacy_defensive_50_10_r100": _timed_profile(
+                take_profit_ratio=0.50,
+                force_close_dte=10,
+                risk_pct_scale=1.00,
+            ),
+            "timed_legacy_defensive_60_10_r100": _timed_profile(
+                take_profit_ratio=0.60,
+                force_close_dte=10,
+                risk_pct_scale=1.00,
+            ),
+            "timed_legacy_defensive_50_14_r125": _timed_profile(
+                take_profit_ratio=0.50,
+                force_close_dte=14,
+                risk_pct_scale=1.25,
+            ),
+            "timed_legacy_defensive_bear_only_40_10_r100": _timed_profile(
+                take_profit_ratio=0.40,
+                force_close_dte=10,
+                risk_pct_scale=1.00,
+                bear_only=True,
+            ),
+            "timed_legacy_defensive_bear_only_50_10_r100": _timed_profile(
+                take_profit_ratio=0.50,
+                force_close_dte=10,
+                risk_pct_scale=1.00,
+                bear_only=True,
+            ),
+            "timed_legacy_defensive_bear_only_50_7_r075": _timed_profile(
+                take_profit_ratio=0.50,
+                force_close_dte=7,
+                risk_pct_scale=0.75,
+                bear_only=True,
+            ),
+        }
+    )
     if mode not in profiles:
         raise ValueError(f"Unsupported regime-credit-spread mode: {mode}")
-    return profiles[mode]
+    profile = copy.deepcopy(profiles[mode])
+    defaults = {
+        "timing_enabled": False,
+        "timed_bear_only": False,
+        "take_profit_ratio_override": None,
+        "force_close_dte_override": None,
+        "risk_pct_scale": 1.0,
+        "bull_pullback_return_min": -0.04,
+        "bull_pullback_return_max": -0.0075,
+        "bull_pullback_rsi_max": 50.0,
+        "bear_rally_fade_return_min": 0.0075,
+        "bear_rally_fade_return_max": 0.04,
+        "bear_rally_fade_rsi_min": 55.0,
+        "neutral_rally_fade_return_min": 0.01,
+        "neutral_rally_fade_return_max": 0.045,
+        "neutral_rally_fade_rsi_min": 58.0,
+        "neutral_close_vs_ma20_min_pct": 0.01,
+    }
+    for key, value in defaults.items():
+        profile.setdefault(key, value)
+    return profile
+
+
+def _apply_regime_credit_overrides(base_params: Dict[str, Any], profile: Dict[str, Any]) -> Dict[str, Any]:
+    params = copy.deepcopy(base_params)
+    params["risk_pct"] = float(params["risk_pct"]) * float(profile.get("risk_pct_scale", 1.0))
+    if profile.get("take_profit_ratio_override") is not None:
+        params["take_profit_ratio"] = float(profile["take_profit_ratio_override"])
+    if profile.get("force_close_dte_override") is not None:
+        params["force_close_dte"] = float(profile["force_close_dte_override"])
+    return params
+
+
+def _credit_timing_signals(
+    profile: Dict[str, Any],
+    regime: str,
+    ret3: float,
+    rsi_val: float,
+    px: float,
+    ma20_val: float,
+    ma50_val: float,
+) -> Dict[str, bool]:
+    if not (pd.notna(ret3) and pd.notna(rsi_val) and pd.notna(px) and pd.notna(ma20_val) and pd.notna(ma50_val)):
+        return {
+            "bull_pullback": False,
+            "bear_rally_fade": False,
+            "neutral_rally_fade": False,
+        }
+
+    bull_pullback = (
+        regime == "bull"
+        and float(profile["bull_pullback_return_min"]) <= float(ret3) <= float(profile["bull_pullback_return_max"])
+        and float(rsi_val) <= float(profile["bull_pullback_rsi_max"])
+        and float(px) >= float(ma50_val)
+    )
+    bear_rally_fade = (
+        regime == "bear"
+        and float(profile["bear_rally_fade_return_min"]) <= float(ret3) <= float(profile["bear_rally_fade_return_max"])
+        and float(rsi_val) >= float(profile["bear_rally_fade_rsi_min"])
+    )
+    neutral_rally_fade = (
+        regime == "neutral"
+        and float(profile["neutral_rally_fade_return_min"]) <= float(ret3) <= float(profile["neutral_rally_fade_return_max"])
+        and float(rsi_val) >= float(profile["neutral_rally_fade_rsi_min"])
+        and float(px) >= (float(ma20_val) * (1.0 + float(profile["neutral_close_vs_ma20_min_pct"])))
+    )
+    return {
+        "bull_pullback": bull_pullback,
+        "bear_rally_fade": bear_rally_fade,
+        "neutral_rally_fade": neutral_rally_fade,
+    }
 
 
 def _classify_credit_regime(
@@ -1025,6 +1267,292 @@ def _classify_credit_regime(
     if px < ma200_val and ma20_val < ma50_val:
         return "bear"
     return "neutral"
+
+
+def _research_index_swing_params(mode: str) -> Dict[str, Any]:
+    profiles: Dict[str, Dict[str, Any]] = {
+        "pullback_baseline_30_45": {
+            "debit_min_dte": 30,
+            "debit_max_dte": 45,
+            "debit_target_dte": 37,
+            "max_debit_dollars": 1200.0,
+            "take_profit_max_gain_ratio": 0.50,
+            "stop_loss_debit_pct": 0.35,
+            "force_close_dte": 10,
+            "risk_pct": 0.0125,
+            "max_contracts_per_symbol": 2,
+            "max_concurrent_positions": 2,
+            "pcs_mode": "legacy_replica",
+            "ccs_mode": "ccs_baseline",
+            "bull_pullback_return_min": -0.04,
+            "bull_pullback_return_max": -0.0075,
+            "bull_pullback_rsi_max": 48.0,
+            "rally_fade_return_min": 0.0075,
+            "rally_fade_return_max": 0.04,
+            "rally_fade_rsi_min": 55.0,
+            "neutral_overextended_min_pct": 0.01,
+            "low_iv_max": 40.0,
+            "pcs_iv_min": 40.0,
+            "ccs_iv_min": 55.0,
+            "allow_bull_overextension_ccs": False,
+            "bull_overextended_min_pct_above_ma20": 0.03,
+            "bull_overextended_min_pct_above_ma50": 0.02,
+            "bull_ccs_iv_min": 65.0,
+        },
+        "pullback_defensive_30_45": {
+            "debit_min_dte": 30,
+            "debit_max_dte": 45,
+            "debit_target_dte": 37,
+            "max_debit_dollars": 900.0,
+            "take_profit_max_gain_ratio": 0.40,
+            "stop_loss_debit_pct": 0.25,
+            "force_close_dte": 14,
+            "risk_pct": 0.0090,
+            "max_contracts_per_symbol": 2,
+            "max_concurrent_positions": 2,
+            "pcs_mode": "pcs_vix_optimal",
+            "ccs_mode": "ccs_defensive",
+            "bull_pullback_return_min": -0.04,
+            "bull_pullback_return_max": -0.0075,
+            "bull_pullback_rsi_max": 48.0,
+            "rally_fade_return_min": 0.0075,
+            "rally_fade_return_max": 0.04,
+            "rally_fade_rsi_min": 55.0,
+            "neutral_overextended_min_pct": 0.01,
+            "low_iv_max": 40.0,
+            "pcs_iv_min": 40.0,
+            "ccs_iv_min": 55.0,
+            "allow_bull_overextension_ccs": False,
+            "bull_overextended_min_pct_above_ma20": 0.03,
+            "bull_overextended_min_pct_above_ma50": 0.02,
+            "bull_ccs_iv_min": 65.0,
+        },
+        "pullback_baseline_45_60": {
+            "debit_min_dte": 45,
+            "debit_max_dte": 60,
+            "debit_target_dte": 52,
+            "max_debit_dollars": 1200.0,
+            "take_profit_max_gain_ratio": 0.50,
+            "stop_loss_debit_pct": 0.35,
+            "force_close_dte": 10,
+            "risk_pct": 0.0125,
+            "max_contracts_per_symbol": 2,
+            "max_concurrent_positions": 2,
+            "pcs_mode": "legacy_replica",
+            "ccs_mode": "ccs_baseline",
+            "bull_pullback_return_min": -0.04,
+            "bull_pullback_return_max": -0.0075,
+            "bull_pullback_rsi_max": 48.0,
+            "rally_fade_return_min": 0.0075,
+            "rally_fade_return_max": 0.04,
+            "rally_fade_rsi_min": 55.0,
+            "neutral_overextended_min_pct": 0.01,
+            "low_iv_max": 40.0,
+            "pcs_iv_min": 40.0,
+            "ccs_iv_min": 55.0,
+            "allow_bull_overextension_ccs": False,
+            "bull_overextended_min_pct_above_ma20": 0.03,
+            "bull_overextended_min_pct_above_ma50": 0.02,
+            "bull_ccs_iv_min": 65.0,
+        },
+        "pullback_defensive_45_60": {
+            "debit_min_dte": 45,
+            "debit_max_dte": 60,
+            "debit_target_dte": 52,
+            "max_debit_dollars": 900.0,
+            "take_profit_max_gain_ratio": 0.40,
+            "stop_loss_debit_pct": 0.25,
+            "force_close_dte": 14,
+            "risk_pct": 0.0090,
+            "max_contracts_per_symbol": 2,
+            "max_concurrent_positions": 2,
+            "pcs_mode": "pcs_vix_optimal",
+            "ccs_mode": "ccs_defensive",
+            "bull_pullback_return_min": -0.04,
+            "bull_pullback_return_max": -0.0075,
+            "bull_pullback_rsi_max": 48.0,
+            "rally_fade_return_min": 0.0075,
+            "rally_fade_return_max": 0.04,
+            "rally_fade_rsi_min": 55.0,
+            "neutral_overextended_min_pct": 0.01,
+            "low_iv_max": 40.0,
+            "pcs_iv_min": 40.0,
+            "ccs_iv_min": 55.0,
+            "allow_bull_overextension_ccs": False,
+            "bull_overextended_min_pct_above_ma20": 0.03,
+            "bull_overextended_min_pct_above_ma50": 0.02,
+            "bull_ccs_iv_min": 65.0,
+        },
+        "pullback_baseline_30_45_v2": {
+            "debit_min_dte": 30,
+            "debit_max_dte": 45,
+            "debit_target_dte": 37,
+            "max_debit_dollars": 1200.0,
+            "take_profit_max_gain_ratio": 0.50,
+            "stop_loss_debit_pct": 0.35,
+            "force_close_dte": 10,
+            "risk_pct": 0.0125,
+            "max_contracts_per_symbol": 2,
+            "max_concurrent_positions": 2,
+            "pcs_mode": "legacy_replica",
+            "ccs_mode": "ccs_baseline",
+            "bull_pullback_return_min": -0.06,
+            "bull_pullback_return_max": -0.005,
+            "bull_pullback_rsi_max": 52.0,
+            "rally_fade_return_min": 0.005,
+            "rally_fade_return_max": 0.05,
+            "rally_fade_rsi_min": 52.0,
+            "neutral_overextended_min_pct": 0.005,
+            "low_iv_max": 25.0,
+            "pcs_iv_min": 25.0,
+            "ccs_iv_min": 45.0,
+            "allow_bull_overextension_ccs": True,
+            "bull_overextended_min_pct_above_ma20": 0.02,
+            "bull_overextended_min_pct_above_ma50": 0.015,
+            "bull_ccs_iv_min": 60.0,
+        },
+        "pullback_defensive_30_45_v2": {
+            "debit_min_dte": 30,
+            "debit_max_dte": 45,
+            "debit_target_dte": 37,
+            "max_debit_dollars": 900.0,
+            "take_profit_max_gain_ratio": 0.40,
+            "stop_loss_debit_pct": 0.25,
+            "force_close_dte": 14,
+            "risk_pct": 0.0090,
+            "max_contracts_per_symbol": 2,
+            "max_concurrent_positions": 2,
+            "pcs_mode": "pcs_vix_optimal",
+            "ccs_mode": "ccs_defensive",
+            "bull_pullback_return_min": -0.06,
+            "bull_pullback_return_max": -0.005,
+            "bull_pullback_rsi_max": 52.0,
+            "rally_fade_return_min": 0.005,
+            "rally_fade_return_max": 0.05,
+            "rally_fade_rsi_min": 52.0,
+            "neutral_overextended_min_pct": 0.005,
+            "low_iv_max": 25.0,
+            "pcs_iv_min": 25.0,
+            "ccs_iv_min": 45.0,
+            "allow_bull_overextension_ccs": True,
+            "bull_overextended_min_pct_above_ma20": 0.02,
+            "bull_overextended_min_pct_above_ma50": 0.015,
+            "bull_ccs_iv_min": 55.0,
+        },
+        "pullback_baseline_45_60_v2": {
+            "debit_min_dte": 45,
+            "debit_max_dte": 60,
+            "debit_target_dte": 52,
+            "max_debit_dollars": 1200.0,
+            "take_profit_max_gain_ratio": 0.50,
+            "stop_loss_debit_pct": 0.35,
+            "force_close_dte": 10,
+            "risk_pct": 0.0125,
+            "max_contracts_per_symbol": 2,
+            "max_concurrent_positions": 2,
+            "pcs_mode": "legacy_replica",
+            "ccs_mode": "ccs_baseline",
+            "bull_pullback_return_min": -0.06,
+            "bull_pullback_return_max": -0.005,
+            "bull_pullback_rsi_max": 52.0,
+            "rally_fade_return_min": 0.005,
+            "rally_fade_return_max": 0.05,
+            "rally_fade_rsi_min": 52.0,
+            "neutral_overextended_min_pct": 0.005,
+            "low_iv_max": 25.0,
+            "pcs_iv_min": 25.0,
+            "ccs_iv_min": 45.0,
+            "allow_bull_overextension_ccs": True,
+            "bull_overextended_min_pct_above_ma20": 0.02,
+            "bull_overextended_min_pct_above_ma50": 0.015,
+            "bull_ccs_iv_min": 60.0,
+        },
+        "pullback_defensive_45_60_v2": {
+            "debit_min_dte": 45,
+            "debit_max_dte": 60,
+            "debit_target_dte": 52,
+            "max_debit_dollars": 900.0,
+            "take_profit_max_gain_ratio": 0.40,
+            "stop_loss_debit_pct": 0.25,
+            "force_close_dte": 14,
+            "risk_pct": 0.0090,
+            "max_contracts_per_symbol": 2,
+            "max_concurrent_positions": 2,
+            "pcs_mode": "pcs_vix_optimal",
+            "ccs_mode": "ccs_defensive",
+            "bull_pullback_return_min": -0.06,
+            "bull_pullback_return_max": -0.005,
+            "bull_pullback_rsi_max": 52.0,
+            "rally_fade_return_min": 0.005,
+            "rally_fade_return_max": 0.05,
+            "rally_fade_rsi_min": 52.0,
+            "neutral_overextended_min_pct": 0.005,
+            "low_iv_max": 25.0,
+            "pcs_iv_min": 25.0,
+            "ccs_iv_min": 45.0,
+            "allow_bull_overextension_ccs": True,
+            "bull_overextended_min_pct_above_ma20": 0.02,
+            "bull_overextended_min_pct_above_ma50": 0.015,
+            "bull_ccs_iv_min": 55.0,
+        },
+    }
+    if mode not in profiles:
+        raise ValueError(f"Unsupported research-index-swing mode: {mode}")
+    return profiles[mode]
+
+
+def _classify_index_swing_regime(
+    px: float,
+    ma20_val: float,
+    ma50_val: float,
+    ma200_val: float,
+) -> str:
+    if not all(pd.notna(v) and float(v) > 0 for v in (px, ma20_val, ma50_val, ma200_val)):
+        return "unknown"
+    if px > ma200_val and ma20_val > ma50_val and px >= ma50_val:
+        return "bull"
+    if px < ma200_val and ma20_val < ma50_val:
+        return "bear"
+    return "neutral"
+
+
+def _route_index_swing_structure(
+    profile: Dict[str, Any],
+    regime: str,
+    bull_pullback_trigger: bool,
+    rally_fade_trigger: bool,
+    iv_percentile: float,
+    neutral_overextended: bool = False,
+    bull_overextended: bool = False,
+) -> str:
+    if pd.isna(iv_percentile):
+        return "cash"
+    low_iv_max = float(profile.get("low_iv_max", 40.0))
+    pcs_iv_min = float(profile.get("pcs_iv_min", low_iv_max))
+    ccs_iv_min = float(profile.get("ccs_iv_min", 55.0))
+    bull_ccs_iv_min = float(profile.get("bull_ccs_iv_min", ccs_iv_min))
+    if regime == "bull" and bull_pullback_trigger:
+        return "bull_call_spread" if float(iv_percentile) < low_iv_max else (
+            "put_credit_spread" if float(iv_percentile) >= pcs_iv_min else "cash"
+        )
+    if regime == "bear" and rally_fade_trigger and float(iv_percentile) >= ccs_iv_min:
+        return "call_credit_spread"
+    if (
+        regime == "neutral"
+        and rally_fade_trigger
+        and neutral_overextended
+        and float(iv_percentile) >= ccs_iv_min
+    ):
+        return "call_credit_spread"
+    if (
+        regime == "bull"
+        and bool(profile.get("allow_bull_overextension_ccs", False))
+        and rally_fade_trigger
+        and bull_overextended
+        and float(iv_percentile) >= bull_ccs_iv_min
+    ):
+        return "call_credit_spread"
+    return "cash"
 
 
 def _credit_spread_intrinsic(
@@ -1134,11 +1662,11 @@ def _run_openclaw_call_credit_spread(
     Sell OTM call (above spot) + buy further OTM call as cap.
     Collect premium when underlying stays below short strike.
     """
-    prices = _build_underlying_close_frame(data, start_date, end_date, symbols=["SPY", "QQQ"])
-    if prices.empty:
-        raise ValueError("No SPY/QQQ data available for openclaw_call_credit_spread")
-
     params = _call_credit_params(assumptions_mode)
+    allowed_symbols = [str(s).upper() for s in params.get("allowed_symbols", ["SPY", "QQQ"])]
+    prices = _build_underlying_close_frame(data, start_date, end_date, symbols=allowed_symbols)
+    if prices.empty:
+        raise ValueError(f"No price data available for openclaw_call_credit_spread ({allowed_symbols})")
     risk_pct = params["risk_pct"]
     short_dist_pct = params["short_dist_pct"]
     width_pct = params["width_pct"]
@@ -1270,8 +1798,10 @@ def _run_openclaw_call_credit_spread(
         if kill_state.get("active"):
             kill_block_days += 1
 
-        for symbol in ["SPY", "QQQ"]:
+        for symbol in allowed_symbols:
             if macro_blocked or kill_state.get("active"):
+                continue
+            if symbol not in prices.columns:
                 continue
             if symbol in [p["symbol"] for p in open_positions]:
                 continue
@@ -1413,7 +1943,7 @@ def _run_openclaw_call_credit_spread(
         variant=assumptions_mode,
         engine_type="openclaw_call_credit_spread_engine",
         assumptions_mode=assumptions_mode,
-        universe="SPY,QQQ",
+        universe=",".join(allowed_symbols),
         strategy_parameters={
             "variant_profile": assumptions_mode,
             "risk_pct": risk_pct,
@@ -1451,17 +1981,21 @@ def _run_openclaw_regime_credit_spread(
     bull_mode = str(profile["bull_mode"])
     bear_mode = str(profile["bear_mode"])
     neutral_mode = str(profile["neutral_mode"])
-    bull_params = _put_credit_params(bull_mode)
-    bear_params = _call_credit_params(bear_mode)
-    neutral_params = _call_credit_params(neutral_mode)
-    allow_neutral_call_entries = bool(profile.get("allow_neutral_call_entries", True))
+    bull_params = _apply_regime_credit_overrides(_put_credit_params(bull_mode), profile)
+    bear_params = _apply_regime_credit_overrides(_call_credit_params(bear_mode), profile)
+    neutral_params = _apply_regime_credit_overrides(_call_credit_params(neutral_mode), profile)
+    timing_enabled = bool(profile.get("timing_enabled", False))
+    timed_bear_only = bool(profile.get("timed_bear_only", False))
+    allow_neutral_call_entries = bool(profile.get("allow_neutral_call_entries", True)) and not timed_bear_only
     max_call_pct_above_ma50 = float(profile.get("max_call_pct_above_ma50", 0.08))
 
     returns = prices.pct_change()
+    returns_3d = prices.pct_change(3)
     hv20 = returns.rolling(20).std() * (252 ** 0.5)
     ma20 = prices.rolling(20).mean()
     ma50 = prices.rolling(50).mean()
     ma200 = prices.rolling(200).mean()
+    rsi14 = _wilder_rsi_frame(prices, period=14)
 
     initial_capital = 100_000.0
     cash = initial_capital
@@ -1475,6 +2009,12 @@ def _run_openclaw_regime_credit_spread(
     kill_block_days = 0
     regime_counts = {"bull": 0, "bear": 0, "neutral": 0}
     entry_counts = {"put": 0, "call": 0}
+    timing_signal_counts = {
+        "bull_pullback": 0,
+        "bear_rally_fade": 0,
+        "neutral_rally_fade": 0,
+    }
+    timed_entry_counts = {"put": 0, "call": 0}
 
     all_days = list(prices.index)
     for day in all_days:
@@ -1585,6 +2125,20 @@ def _run_openclaw_regime_credit_spread(
             if regime == "unknown":
                 continue
             regime_counts[regime] += 1
+            ret3 = float(returns_3d.loc[day, symbol])
+            rsi_val = float(rsi14.loc[day, symbol])
+            timing_signals = _credit_timing_signals(
+                profile=profile,
+                regime=regime,
+                ret3=ret3,
+                rsi_val=rsi_val,
+                px=px,
+                ma20_val=ma20_val,
+                ma50_val=ma50_val,
+            )
+            for key, value in timing_signals.items():
+                if value:
+                    timing_signal_counts[key] += 1
 
             params: Optional[Dict[str, Any]] = None
             side = ""
@@ -1603,6 +2157,13 @@ def _run_openclaw_regime_credit_spread(
                 profile_mode = neutral_mode
             if not params:
                 continue
+            if timing_enabled:
+                if side == "put" and not timing_signals["bull_pullback"]:
+                    continue
+                if side == "call" and regime == "bear" and not timing_signals["bear_rally_fade"]:
+                    continue
+                if side == "call" and regime == "neutral" and not timing_signals["neutral_rally_fade"]:
+                    continue
 
             iv_proxy = float(hv20.loc[day, symbol])
             if not (float(params["iv_low"]) <= iv_proxy <= float(params["iv_high"])):
@@ -1685,6 +2246,8 @@ def _run_openclaw_regime_credit_spread(
                 }
             )
             entry_counts[side] += 1
+            if timing_enabled:
+                timed_entry_counts[side] += 1
 
         end_unrealized = 0.0
         for pos in open_positions:
@@ -1754,9 +2317,20 @@ def _run_openclaw_regime_credit_spread(
         "bear_profile_mode": bear_mode,
         "neutral_profile_mode": neutral_mode,
         "allow_neutral_call_entries": allow_neutral_call_entries,
+        "timing_enabled": timing_enabled,
+        "timed_bear_only": timed_bear_only,
         "entry_counts": {
             "put": int(entry_counts["put"]),
             "call": int(entry_counts["call"]),
+        },
+        "timing_signal_counts": {
+            "bull_pullback": int(timing_signal_counts["bull_pullback"]),
+            "bear_rally_fade": int(timing_signal_counts["bear_rally_fade"]),
+            "neutral_rally_fade": int(timing_signal_counts["neutral_rally_fade"]),
+        },
+        "timed_entry_counts": {
+            "put": int(timed_entry_counts["put"]),
+            "call": int(timed_entry_counts["call"]),
         },
         "closed_trade_counts": {
             "put": int(closed_put_trades),
@@ -1766,6 +2340,31 @@ def _run_openclaw_regime_credit_spread(
             "bull": int(regime_counts["bull"]),
             "bear": int(regime_counts["bear"]),
             "neutral": int(regime_counts["neutral"]),
+        },
+        "timing_thresholds": {
+            "bull_pullback_return_min": float(profile["bull_pullback_return_min"]),
+            "bull_pullback_return_max": float(profile["bull_pullback_return_max"]),
+            "bull_pullback_rsi_max": float(profile["bull_pullback_rsi_max"]),
+            "bear_rally_fade_return_min": float(profile["bear_rally_fade_return_min"]),
+            "bear_rally_fade_return_max": float(profile["bear_rally_fade_return_max"]),
+            "bear_rally_fade_rsi_min": float(profile["bear_rally_fade_rsi_min"]),
+            "neutral_rally_fade_return_min": float(profile["neutral_rally_fade_return_min"]),
+            "neutral_rally_fade_return_max": float(profile["neutral_rally_fade_return_max"]),
+            "neutral_rally_fade_rsi_min": float(profile["neutral_rally_fade_rsi_min"]),
+            "neutral_close_vs_ma20_min_pct": float(profile["neutral_close_vs_ma20_min_pct"]),
+        },
+        "management_overrides": {
+            "take_profit_ratio_override": (
+                None
+                if profile.get("take_profit_ratio_override") is None
+                else float(profile["take_profit_ratio_override"])
+            ),
+            "force_close_dte_override": (
+                None
+                if profile.get("force_close_dte_override") is None
+                else int(profile["force_close_dte_override"])
+            ),
+            "risk_pct_scale": float(profile.get("risk_pct_scale", 1.0)),
         },
     }
 
@@ -1782,10 +2381,571 @@ def _run_openclaw_regime_credit_spread(
             "bear_profile_mode": bear_mode,
             "neutral_profile_mode": neutral_mode,
             "allow_neutral_call_entries": allow_neutral_call_entries,
+            "timing_enabled": timing_enabled,
+            "timed_bear_only": timed_bear_only,
             "max_call_pct_above_ma50": max_call_pct_above_ma50,
             "bull_params": bull_params,
             "bear_params": bear_params,
             "neutral_params": neutral_params,
+            "timing_thresholds": component_metrics["timing_thresholds"],
+            "management_overrides": component_metrics["management_overrides"],
+        },
+        metrics=metrics,
+        equity_curve=[float(v) for v in equity_curve],
+        equity_points=equity_points,
+        trade_pnls=trade_pnls,
+        component_metrics=component_metrics,
+    )
+
+
+def _run_research_index_swing_options(
+    data: pd.DataFrame,
+    start_date: date,
+    end_date: date,
+    assumptions_mode: str,
+) -> EngineOutput:
+    symbols = ["SPY", "QQQ"]
+    frame = _prepare_option_research_frame(data, start_date, end_date, symbols=symbols)
+    if frame.empty:
+        raise ValueError("No SPY/QQQ option-chain data available for research_index_swing_options")
+
+    prices = _build_underlying_close_frame(data, start_date, end_date, symbols=symbols)
+    if prices.empty:
+        raise ValueError("No SPY/QQQ price data available for research_index_swing_options")
+
+    profile = _research_index_swing_params(assumptions_mode)
+    pcs_mode = str(profile["pcs_mode"])
+    ccs_mode = str(profile["ccs_mode"])
+    pcs_params = _put_credit_params(pcs_mode)
+    ccs_params = _call_credit_params(ccs_mode)
+
+    returns_1d = prices.pct_change()
+    returns_3d = prices.pct_change(3)
+    hv20 = returns_1d.rolling(20).std() * (252 ** 0.5)
+    ma20 = prices.rolling(20).mean()
+    ma50 = prices.rolling(50).mean()
+    ma200 = prices.rolling(200).mean()
+    rsi14 = _wilder_rsi_frame(prices, period=14)
+    iv_percentiles = {
+        symbol: _build_daily_iv_percentile(
+            frame,
+            symbol,
+            min_dte=int(profile["debit_min_dte"]),
+            max_dte=int(profile["debit_max_dte"]),
+            lookback_days=252,
+        )
+        for symbol in symbols
+    }
+    grouped = {d: g.copy() for d, g in frame.groupby("date")}
+
+    initial_capital = 100_000.0
+    cash = initial_capital
+    open_positions: List[Dict[str, Any]] = []
+    trades: List[Dict[str, Any]] = []
+    equity_curve: List[float] = [initial_capital]
+    equity_points: List[Tuple[date, float]] = []
+
+    structure_entry_counts = {
+        "bull_call_spread": 0,
+        "put_credit_spread": 0,
+        "call_credit_spread": 0,
+    }
+    closed_trade_counts = {
+        "bull_call_spread": 0,
+        "put_credit_spread": 0,
+        "call_credit_spread": 0,
+    }
+    entry_counts_by_symbol = {symbol: 0 for symbol in symbols}
+    regime_counts = {"bull": 0, "bear": 0, "neutral": 0}
+    signal_counts = {"bull_pullback": 0, "rally_fade": 0}
+    overextension_counts = {"neutral": 0, "bull": 0}
+    entry_ivps: List[float] = []
+
+    for day in prices.index:
+        day_prices = prices.loc[day]
+        day_slice = grouped.get(day, pd.DataFrame())
+        realized_today = 0.0
+        remaining_positions: List[Dict[str, Any]] = []
+
+        for pos in open_positions:
+            symbol = str(pos["symbol"])
+            px = float(day_prices[symbol])
+            held_days = (day - pos["entry_date"]).days
+            dte_left = max((pos["expiry_date"] - day).days, 0)
+            symbol_slice = day_slice[day_slice["underlying"] == symbol]
+
+            should_close = False
+            reason = "hold"
+            realized = 0.0
+
+            if pos["structure"] == "bull_call_spread":
+                current_value = _bull_call_spread_close_value_dollars(pos, symbol_slice, day)
+                take_profit_hit = (
+                    current_value
+                    >= pos["entry_debit_dollars"]
+                    + (pos["max_gain_dollars"] * pos["take_profit_max_gain_ratio"])
+                )
+                stop_hit = current_value <= (
+                    pos["entry_debit_dollars"] * (1.0 - pos["stop_loss_debit_pct"])
+                )
+                bearish_break = (
+                    pd.notna(ma50.loc[day, symbol])
+                    and (
+                        px < float(ma50.loc[day, symbol])
+                        or (
+                            pd.notna(ma20.loc[day, symbol])
+                            and float(ma20.loc[day, symbol]) < float(ma50.loc[day, symbol])
+                        )
+                    )
+                )
+                if take_profit_hit and held_days >= pos["min_hold_days"]:
+                    should_close = True
+                    reason = "take_profit"
+                elif stop_hit:
+                    should_close = True
+                    reason = "stop_loss"
+                elif bearish_break and held_days >= pos["min_hold_days"]:
+                    should_close = True
+                    reason = "trend_break"
+                elif dte_left <= pos["force_close_dte"]:
+                    should_close = True
+                    reason = "time_exit"
+                elif dte_left <= 0:
+                    should_close = True
+                    reason = "expiry"
+
+                if should_close:
+                    exit_fees = pos["exit_fee_per_spread"] * pos["qty"]
+                    cash += (current_value * pos["qty"]) - exit_fees
+                    realized = (
+                        ((current_value - pos["entry_debit_dollars"]) * pos["qty"])
+                        - pos["entry_fees_total"]
+                        - exit_fees
+                    )
+                else:
+                    remaining_positions.append(pos)
+            else:
+                hv_today = (
+                    float(hv20.loc[day, symbol])
+                    if pd.notna(hv20.loc[day, symbol])
+                    else pos["entry_hv"]
+                )
+                spread_value = _credit_spread_active_value(pos, px, hv_today, day)
+                pnl_per_contract = (pos["credit"] - spread_value) * 100.0
+                take_profit_hit = pnl_per_contract >= (
+                    pos["credit"] * 100.0 * pos["take_profit_ratio"]
+                )
+                stop_hit = spread_value >= max(
+                    (pos["credit"] * pos["stop_mult"]),
+                    (pos["width"] * 0.55),
+                )
+                if pos["side"] == "put":
+                    breach = px <= pos["long_strike"]
+                else:
+                    breach = px >= pos["long_strike"]
+
+                if take_profit_hit and held_days >= pos["min_hold_days"]:
+                    should_close = True
+                    reason = "take_profit"
+                elif stop_hit:
+                    should_close = True
+                    reason = "stop_loss"
+                elif breach:
+                    should_close = True
+                    reason = "long_strike_breach"
+                elif dte_left <= pos["force_close_dte"]:
+                    should_close = True
+                    reason = "time_exit"
+                elif dte_left <= 0:
+                    should_close = True
+                    reason = "expiry"
+
+                if should_close:
+                    exit_fees = pos["fee_per_contract"] * pos["qty"]
+                    realized = (pnl_per_contract * pos["qty"]) - exit_fees
+                    cash += realized
+                else:
+                    remaining_positions.append(pos)
+
+            if should_close:
+                closed_trade_counts[pos["structure"]] += 1
+                trades.append(
+                    {
+                        "underlying": symbol,
+                        "entry_date": pos["entry_date"].isoformat(),
+                        "close_date": day.isoformat(),
+                        "entry_price": round(pos["entry_price_display"], 4),
+                        "close_price": round(
+                            (current_value / 100.0)
+                            if pos["structure"] == "bull_call_spread"
+                            else spread_value,
+                            4,
+                        ),
+                        "qty": int(pos["qty"]),
+                        "realized_pnl": round(realized, 4),
+                        "close_reason": reason,
+                        "structure": pos["structure"],
+                        "entry_regime": pos["entry_regime"],
+                        "entry_iv_percentile": round(pos["entry_iv_percentile"], 4),
+                    }
+                )
+
+        open_positions = remaining_positions
+
+        current_symbols = {str(p["symbol"]) for p in open_positions}
+        open_count = len(open_positions)
+        for symbol in symbols:
+            if open_count >= int(profile["max_concurrent_positions"]):
+                break
+            if symbol in current_symbols:
+                continue
+            px = float(day_prices[symbol])
+            if not (pd.notna(px) and px > 0):
+                continue
+            if any(pd.isna(series.loc[day, symbol]) for series in (ma20, ma50, ma200, rsi14, returns_3d, hv20)):
+                continue
+
+            ma20_val = float(ma20.loc[day, symbol])
+            ma50_val = float(ma50.loc[day, symbol])
+            ma200_val = float(ma200.loc[day, symbol])
+            regime = _classify_index_swing_regime(px, ma20_val, ma50_val, ma200_val)
+            if regime == "unknown":
+                continue
+            regime_counts[regime] += 1
+
+            ret3 = float(returns_3d.loc[day, symbol])
+            rsi_val = float(rsi14.loc[day, symbol])
+            bull_pullback = (
+                float(profile["bull_pullback_return_min"]) <= ret3 <= float(profile["bull_pullback_return_max"])
+            ) and (rsi_val <= float(profile["bull_pullback_rsi_max"]))
+            neutral_overextended = (
+                px >= (ma20_val * (1.0 + float(profile["neutral_overextended_min_pct"])))
+                if ma20_val > 0
+                else False
+            )
+            bull_overextended = (
+                ma20_val > 0
+                and ma50_val > 0
+                and px >= (ma20_val * (1.0 + float(profile.get("bull_overextended_min_pct_above_ma20", 0.03))))
+                and px >= (ma50_val * (1.0 + float(profile.get("bull_overextended_min_pct_above_ma50", 0.02))))
+            )
+            rally_fade = (
+                float(profile["rally_fade_return_min"]) <= ret3 <= float(profile["rally_fade_return_max"])
+            ) and (rsi_val >= float(profile["rally_fade_rsi_min"]))
+            if regime == "neutral":
+                rally_fade = rally_fade and neutral_overextended
+
+            if bull_pullback:
+                signal_counts["bull_pullback"] += 1
+            if rally_fade:
+                signal_counts["rally_fade"] += 1
+            if neutral_overextended:
+                overextension_counts["neutral"] += 1
+            if bull_overextended:
+                overextension_counts["bull"] += 1
+
+            iv_series = iv_percentiles.get(symbol, pd.Series(dtype=float))
+            iv_percentile = float(iv_series.get(day)) if day in iv_series.index else float("nan")
+            structure = _route_index_swing_structure(
+                profile=profile,
+                regime=regime,
+                bull_pullback_trigger=bull_pullback,
+                rally_fade_trigger=rally_fade,
+                iv_percentile=iv_percentile,
+                neutral_overextended=neutral_overextended,
+                bull_overextended=bull_overextended,
+            )
+            if structure == "cash":
+                continue
+
+            if structure == "bull_call_spread":
+                symbol_slice = day_slice[day_slice["underlying"] == symbol]
+                if symbol_slice.empty:
+                    continue
+                candidate = _select_bull_call_spread(
+                    day_slice=symbol_slice,
+                    underlying=symbol,
+                    target_dte=int(profile["debit_target_dte"]),
+                    min_dte=int(profile["debit_min_dte"]),
+                    max_dte=int(profile["debit_max_dte"]),
+                    target_long_delta=0.60,
+                    min_long_delta=0.45,
+                    max_long_delta=0.75,
+                    target_short_delta=0.35,
+                    min_short_delta=0.20,
+                    max_short_delta=0.50,
+                    min_debit_dollars=150.0,
+                    max_debit_dollars=float(profile["max_debit_dollars"]),
+                    max_spread_pct=0.12,
+                    min_open_interest=200,
+                )
+                if candidate is None:
+                    continue
+                qty = int((cash * float(profile["risk_pct"])) // candidate["entry_debit_dollars"])
+                qty = max(1, min(qty, int(profile["max_contracts_per_symbol"])))
+                entry_fees_total = candidate["entry_fees_dollars"] * qty
+                cash -= (candidate["entry_debit_dollars"] * qty) + entry_fees_total
+                open_positions.append(
+                    {
+                        **candidate,
+                        "symbol": symbol,
+                        "structure": "bull_call_spread",
+                        "entry_date": day,
+                        "qty": qty,
+                        "entry_regime": regime,
+                        "entry_iv_percentile": iv_percentile,
+                        "take_profit_max_gain_ratio": float(profile["take_profit_max_gain_ratio"]),
+                        "stop_loss_debit_pct": float(profile["stop_loss_debit_pct"]),
+                        "force_close_dte": int(profile["force_close_dte"]),
+                        "min_hold_days": 3,
+                        "exit_fee_per_spread": candidate["entry_fees_dollars"],
+                        "entry_fees_total": entry_fees_total,
+                        "entry_price_display": candidate["entry_debit_dollars"] / 100.0,
+                    }
+                )
+            else:
+                params = pcs_params if structure == "put_credit_spread" else ccs_params
+                iv_proxy = float(hv20.loc[day, symbol])
+                if not (float(params["iv_low"]) <= iv_proxy <= float(params["iv_high"])):
+                    continue
+                if structure == "put_credit_spread" and bool(params.get("vix_gate_enabled", False)):
+                    spy_hv = (
+                        float(hv20.loc[day, "SPY"])
+                        if "SPY" in hv20.columns and pd.notna(hv20.loc[day, "SPY"])
+                        else iv_proxy
+                    )
+                    if spy_hv < float(params.get("vix_min_threshold", 0.0)):
+                        continue
+                    if spy_hv > float(params.get("vix_max_threshold", 999.0)):
+                        continue
+                if structure == "call_credit_spread" and ma50_val > 0:
+                    max_call_pct_above_ma50 = 0.05 if ccs_mode == "ccs_defensive" else 0.08
+                    if ((px - ma50_val) / ma50_val) > max_call_pct_above_ma50:
+                        continue
+
+                short_dist_pct = float(params["short_dist_pct"])
+                width_pct = float(params["width_pct"])
+                credit_ratio = float(params["credit_ratio"])
+                dte_days = int(params["dte_days"])
+                short_strike = (
+                    round(px * (1.0 - short_dist_pct), 2)
+                    if structure == "put_credit_spread"
+                    else round(px * (1.0 + short_dist_pct), 2)
+                )
+                width = round(max(px * width_pct, 1.0), 2)
+                long_strike = (
+                    round(short_strike - width, 2)
+                    if structure == "put_credit_spread"
+                    else round(short_strike + width, 2)
+                )
+                credit = round(width * credit_ratio, 2)
+                max_loss_per_contract = max((width - credit) * 100.0, 1.0)
+                qty_risk = int((cash * float(profile["risk_pct"])) // max_loss_per_contract)
+                qty_vol = vol_target_contracts(
+                    equity=cash,
+                    option_price=max(credit, 0.25),
+                    underlying_annual_vol=max(iv_proxy, 0.05),
+                    target_annual_vol=float(params.get("target_annual_vol", 0.18)),
+                    max_contracts=int(profile["max_contracts_per_symbol"]),
+                )
+                qty = max(1, min(qty_risk, qty_vol, int(profile["max_contracts_per_symbol"])))
+                qty = cap_symbol_notional(
+                    contracts=qty,
+                    option_price=max(short_strike, px),
+                    equity=cash,
+                    max_symbol_notional_pct=float(params.get("max_symbol_notional_pct", 0.20)),
+                )
+                if qty < 1:
+                    continue
+
+                open_positions.append(
+                    {
+                        "symbol": symbol,
+                        "structure": structure,
+                        "side": "put" if structure == "put_credit_spread" else "call",
+                        "entry_date": day,
+                        "expiry_date": day + timedelta(days=dte_days),
+                        "dte_days": dte_days,
+                        "short_strike": short_strike,
+                        "long_strike": long_strike,
+                        "width": width,
+                        "credit": credit,
+                        "qty": qty,
+                        "take_profit_ratio": float(params["take_profit_ratio"]),
+                        "stop_mult": float(params["stop_mult"]),
+                        "min_hold_days": int(params["min_hold_days"]),
+                        "force_close_dte": int(params["force_close_dte"]),
+                        "entry_underlying": px,
+                        "entry_hv": iv_proxy,
+                        "short_dist_pct": short_dist_pct,
+                        "fee_per_contract": float(params["fee_per_contract"]),
+                        "entry_regime": regime,
+                        "entry_iv_percentile": iv_percentile,
+                        "entry_price_display": credit,
+                    }
+                )
+
+            open_count += 1
+            current_symbols.add(symbol)
+            entry_counts_by_symbol[symbol] += 1
+            structure_entry_counts[structure] += 1
+            entry_ivps.append(iv_percentile)
+
+        unrealized_total = 0.0
+        for pos in open_positions:
+            symbol = str(pos["symbol"])
+            px = float(day_prices[symbol])
+            if pos["structure"] == "bull_call_spread":
+                symbol_slice = day_slice[day_slice["underlying"] == symbol]
+                unrealized_total += _bull_call_spread_close_value_dollars(pos, symbol_slice, day) * pos["qty"]
+            else:
+                hv_today = (
+                    float(hv20.loc[day, symbol])
+                    if pd.notna(hv20.loc[day, symbol])
+                    else pos["entry_hv"]
+                )
+                spread_value = _credit_spread_mark_value(pos, px, hv_today, day)
+                pnl_per_contract = (pos["credit"] - spread_value) * 100.0
+                unrealized_total += pnl_per_contract * pos["qty"]
+
+        equity = cash + unrealized_total
+        equity_curve.append(float(equity))
+        equity_points.append((day, float(equity)))
+
+    if open_positions and equity_points:
+        last_day = equity_points[-1][0]
+        last_prices = prices.loc[last_day]
+        day_slice = grouped.get(last_day, pd.DataFrame())
+        for pos in open_positions:
+            symbol = str(pos["symbol"])
+            px = float(last_prices[symbol])
+            if pos["structure"] == "bull_call_spread":
+                symbol_slice = day_slice[day_slice["underlying"] == symbol]
+                current_value = _bull_call_spread_close_value_dollars(pos, symbol_slice, last_day)
+                exit_fees = pos["exit_fee_per_spread"] * pos["qty"]
+                cash += (current_value * pos["qty"]) - exit_fees
+                realized = (
+                    ((current_value - pos["entry_debit_dollars"]) * pos["qty"])
+                    - pos["entry_fees_total"]
+                    - exit_fees
+                )
+                close_price = current_value / 100.0
+            else:
+                spread_value = _credit_spread_period_end_value(pos, px)
+                realized = ((pos["credit"] - spread_value) * 100.0 * pos["qty"]) - (
+                    pos["fee_per_contract"] * pos["qty"]
+                )
+                cash += realized
+                close_price = spread_value
+            closed_trade_counts[pos["structure"]] += 1
+            trades.append(
+                {
+                    "underlying": symbol,
+                    "entry_date": pos["entry_date"].isoformat(),
+                    "close_date": last_day.isoformat(),
+                    "entry_price": round(pos["entry_price_display"], 4),
+                    "close_price": round(close_price, 4),
+                    "qty": int(pos["qty"]),
+                    "realized_pnl": round(realized, 4),
+                    "close_reason": "period_end",
+                    "structure": pos["structure"],
+                    "entry_regime": pos["entry_regime"],
+                    "entry_iv_percentile": round(pos["entry_iv_percentile"], 4),
+                }
+            )
+        equity_curve[-1] = float(cash)
+        equity_points[-1] = (last_day, float(cash))
+
+    metrics = compute_metrics(trades, equity_curve)
+    metrics["rolls_executed"] = 0
+    metrics["trading_days"] = len(prices.index)
+    metrics["bull_call_entries"] = int(structure_entry_counts["bull_call_spread"])
+    metrics["put_entries"] = int(structure_entry_counts["put_credit_spread"])
+    metrics["call_entries"] = int(structure_entry_counts["call_credit_spread"])
+    metrics["avg_entry_iv_percentile"] = (
+        round(sum(entry_ivps) / len(entry_ivps), 4) if entry_ivps else 0.0
+    )
+
+    trade_pnls = _closed_trade_pnls(trades)
+    component_metrics = {
+        "structure_entry_counts": {
+            key: int(value) for key, value in structure_entry_counts.items()
+        },
+        "closed_trade_counts": {
+            key: int(value) for key, value in closed_trade_counts.items()
+        },
+        "entry_counts_by_symbol": {
+            key: int(value) for key, value in entry_counts_by_symbol.items()
+        },
+        "signal_counts": {key: int(value) for key, value in signal_counts.items()},
+        "overextension_counts": {key: int(value) for key, value in overextension_counts.items()},
+        "regime_days": {key: int(value) for key, value in regime_counts.items()},
+        "pcs_mode": pcs_mode,
+        "ccs_mode": ccs_mode,
+        "debit_dte_range": [
+            int(profile["debit_min_dte"]),
+            int(profile["debit_max_dte"]),
+        ],
+        "routing_thresholds": {
+            "low_iv_max": float(profile["low_iv_max"]),
+            "pcs_iv_min": float(profile["pcs_iv_min"]),
+            "ccs_iv_min": float(profile["ccs_iv_min"]),
+            "bull_ccs_iv_min": float(profile["bull_ccs_iv_min"]),
+            "bull_pullback_return_min": float(profile["bull_pullback_return_min"]),
+            "bull_pullback_return_max": float(profile["bull_pullback_return_max"]),
+            "bull_pullback_rsi_max": float(profile["bull_pullback_rsi_max"]),
+            "rally_fade_return_min": float(profile["rally_fade_return_min"]),
+            "rally_fade_return_max": float(profile["rally_fade_return_max"]),
+            "rally_fade_rsi_min": float(profile["rally_fade_rsi_min"]),
+            "neutral_overextended_min_pct": float(profile["neutral_overextended_min_pct"]),
+            "allow_bull_overextension_ccs": bool(profile.get("allow_bull_overextension_ccs", False)),
+        },
+    }
+
+    return EngineOutput(
+        strategy_id="research_index_swing_options",
+        strategy_name="Research Index Swing Options",
+        variant=assumptions_mode,
+        engine_type="research_index_swing_options_engine",
+        assumptions_mode=assumptions_mode,
+        universe="SPY,QQQ",
+        strategy_parameters={
+            "variant_profile": assumptions_mode,
+            "universe": ["SPY", "QQQ"],
+            "bull_pullback_3d_return_range": [
+                float(profile["bull_pullback_return_min"]),
+                float(profile["bull_pullback_return_max"]),
+            ],
+            "bull_pullback_rsi_max": float(profile["bull_pullback_rsi_max"]),
+            "rally_fade_3d_return_range": [
+                float(profile["rally_fade_return_min"]),
+                float(profile["rally_fade_return_max"]),
+            ],
+            "rally_fade_rsi_min": float(profile["rally_fade_rsi_min"]),
+            "neutral_overextended_min_pct": float(profile["neutral_overextended_min_pct"]),
+            "bull_overextended_min_pct_above_ma20": float(
+                profile.get("bull_overextended_min_pct_above_ma20", 0.03)
+            ),
+            "bull_overextended_min_pct_above_ma50": float(
+                profile.get("bull_overextended_min_pct_above_ma50", 0.02)
+            ),
+            "iv_percentile_low_threshold": float(profile["low_iv_max"]),
+            "iv_percentile_pcs_threshold": float(profile["pcs_iv_min"]),
+            "iv_percentile_high_threshold": float(profile["ccs_iv_min"]),
+            "iv_percentile_bull_ccs_threshold": float(profile["bull_ccs_iv_min"]),
+            "debit_dte_range": [
+                int(profile["debit_min_dte"]),
+                int(profile["debit_max_dte"]),
+            ],
+            "debit_long_delta_target": 0.60,
+            "debit_short_delta_target": 0.35,
+            "debit_max_debit_dollars": float(profile["max_debit_dollars"]),
+            "risk_pct_per_position": float(profile["risk_pct"]),
+            "max_contracts_per_symbol": int(profile["max_contracts_per_symbol"]),
+            "max_concurrent_positions": int(profile["max_concurrent_positions"]),
+            "pcs_mode": pcs_mode,
+            "ccs_mode": ccs_mode,
+            "routing_thresholds": component_metrics["routing_thresholds"],
         },
         metrics=metrics,
         equity_curve=[float(v) for v in equity_curve],
@@ -2949,13 +4109,40 @@ def _prepare_option_research_frame(
     if not required.issubset(set(data.columns)):
         return pd.DataFrame()
 
-    frame = data.copy()
-    frame["date"] = pd.to_datetime(frame["date"]).dt.date
-    frame["expiration_date"] = pd.to_datetime(frame["expiration_date"]).dt.date
-    frame = frame[(frame["date"] >= start_date) & (frame["date"] <= end_date)]
-    frame = frame[frame["underlying"].isin(symbols)].copy()
+    cols = [
+        "date",
+        "underlying",
+        "contract_symbol",
+        "option_type",
+        "strike",
+        "expiration_date",
+        "dte",
+        "bid",
+        "ask",
+        "delta",
+        "underlying_price",
+    ]
+    for optional in ("implied_volatility", "spread_pct", "open_interest"):
+        if optional in data.columns:
+            cols.append(optional)
+    dates = pd.to_datetime(data["date"]).dt.date
+    mask = data["underlying"].isin(symbols) & (dates >= start_date) & (dates <= end_date)
+    if not bool(mask.any()):
+        return pd.DataFrame()
+
+    # Build the filtered frame one column at a time to avoid a large temporary
+    # block allocation when pandas slices both rows and columns on the full cache.
+    row_idx = np.flatnonzero(mask.to_numpy())
+    frame = pd.DataFrame(
+        {
+            col: data[col].to_numpy(copy=False)[row_idx]
+            for col in cols
+        }
+    )
     if frame.empty:
         return pd.DataFrame()
+    frame["date"] = dates.to_numpy(copy=False)[row_idx]
+    frame["expiration_date"] = pd.to_datetime(frame["expiration_date"]).dt.date
 
     numeric_cols = [
         "strike",
@@ -3042,15 +4229,17 @@ def _lookup_leg_close_price(
     day: date,
     side: str,
 ) -> float:
-    if not day_slice.empty:
+    if not day_slice.empty and "contract_symbol" in day_slice.columns:
         match = day_slice[day_slice["contract_symbol"] == leg["contract_symbol"]]
         if match.empty:
-            match = day_slice[
-                (day_slice["underlying"] == leg["underlying"])
-                & (day_slice["option_type"].astype(str).str.lower() == leg["option_type"])
-                & (day_slice["expiration_date"] == leg["expiration_date"])
-                & (day_slice["strike"] == leg["strike"])
-            ]
+            required_cols = {"underlying", "option_type", "expiration_date", "strike"}
+            if required_cols.issubset(set(day_slice.columns)):
+                match = day_slice[
+                    (day_slice["underlying"] == leg["underlying"])
+                    & (day_slice["option_type"].astype(str).str.lower() == leg["option_type"])
+                    & (day_slice["expiration_date"] == leg["expiration_date"])
+                    & (day_slice["strike"] == leg["strike"])
+                ]
         if not match.empty:
             row = match.iloc[0]
             if side == "sell":
@@ -3260,59 +4449,112 @@ def _select_spy_iron_condor_proxy(day_slice: pd.DataFrame) -> Optional[Dict[str,
     return best_candidate
 
 
-def _select_msft_bull_call_spread(day_slice: pd.DataFrame) -> Optional[Dict[str, Any]]:
+def _select_bull_call_spread(
+    day_slice: pd.DataFrame,
+    underlying: str,
+    target_dte: int = 45,
+    min_dte: int = 30,
+    max_dte: int = 60,
+    target_long_delta: float = 0.60,
+    min_long_delta: float = 0.45,
+    max_long_delta: float = 0.75,
+    target_short_delta: float = 0.35,
+    min_short_delta: float = 0.20,
+    max_short_delta: float = 0.50,
+    min_debit_dollars: float = 150.0,
+    max_debit_dollars: float = 1200.0,
+    max_spread_pct: float = 0.12,
+    min_open_interest: int = 200,
+) -> Optional[Dict[str, Any]]:
     chain = day_slice[
-        (day_slice["underlying"] == "MSFT")
+        (day_slice["underlying"] == underlying)
         & (day_slice["option_type"].astype(str).str.lower() == "call")
-        & (day_slice["dte"] >= 30)
-        & (day_slice["dte"] <= 60)
-    ]
+        & (day_slice["dte"] >= min_dte)
+        & (day_slice["dte"] <= max_dte)
+    ].copy()
     if chain.empty:
         return None
+
+    if "spread_pct" not in chain.columns:
+        chain["spread_pct"] = (chain["ask"] - chain["bid"]) / chain["ask"].clip(lower=0.01)
 
     expiries = sorted(
         chain["expiration_date"].dropna().unique().tolist(),
         key=lambda exp: abs(
-            float(chain[chain["expiration_date"] == exp]["dte"].median()) - 45.0
+            float(chain[chain["expiration_date"] == exp]["dte"].median()) - float(target_dte)
         ),
     )
     best_candidate: Optional[Dict[str, Any]] = None
     best_score = float("-inf")
 
     for exp in expiries:
-        exp_rows = chain[chain["expiration_date"] == exp]
-        longs = exp_rows[(exp_rows["delta"] >= 0.50) & (exp_rows["delta"] <= 0.75)].copy()
+        exp_rows = chain[chain["expiration_date"] == exp].copy()
+        if exp_rows.empty:
+            continue
+        longs = exp_rows[
+            (exp_rows["delta"] >= min_long_delta)
+            & (exp_rows["delta"] <= max_long_delta)
+        ].copy()
         if longs.empty:
             continue
-        longs["_delta_gap"] = (longs["delta"] - 0.60).abs()
-        longs = longs.sort_values(["_delta_gap", "ask", "strike"])
+        if "open_interest" in longs.columns:
+            longs = longs[
+                longs["open_interest"].isna() | (longs["open_interest"] >= min_open_interest)
+            ]
+        longs = longs[longs["spread_pct"] <= max_spread_pct]
+        if longs.empty:
+            continue
+        longs["_delta_gap"] = (longs["delta"] - target_long_delta).abs()
+        longs = longs.sort_values(["_delta_gap", "spread_pct", "ask", "strike"])
 
-        for _, long_call in longs.head(5).iterrows():
+        for _, long_call in longs.head(8).iterrows():
             shorts = exp_rows[
                 (exp_rows["strike"] > float(long_call["strike"]))
-                & (exp_rows["delta"] >= 0.20)
-                & (exp_rows["delta"] <= 0.45)
+                & (exp_rows["delta"] >= min_short_delta)
+                & (exp_rows["delta"] <= max_short_delta)
             ].copy()
             if shorts.empty:
                 continue
-            shorts["_delta_gap"] = (shorts["delta"] - 0.30).abs()
-            shorts = shorts.sort_values(["_delta_gap", "strike", "ask"])
-            for _, short_call in shorts.head(6).iterrows():
+            if "open_interest" in shorts.columns:
+                shorts = shorts[
+                    shorts["open_interest"].isna() | (shorts["open_interest"] >= min_open_interest)
+                ]
+            shorts = shorts[shorts["spread_pct"] <= max_spread_pct]
+            if shorts.empty:
+                continue
+            shorts["_delta_gap"] = (shorts["delta"] - target_short_delta).abs()
+            shorts = shorts.sort_values(["_delta_gap", "spread_pct", "strike", "ask"])
+
+            for _, short_call in shorts.head(8).iterrows():
                 width_dollars = (float(short_call["strike"]) - float(long_call["strike"])) * 100.0
                 entry_debit_dollars = (
                     float(long_call["ask"]) - float(short_call["bid"])
                 ) * 100.0
                 max_gain_dollars = width_dollars - entry_debit_dollars
+                combined_spread_pct = (
+                    ((float(long_call["ask"]) - float(long_call["bid"])) +
+                     (float(short_call["ask"]) - float(short_call["bid"])))
+                    / max((float(long_call["ask"]) - float(short_call["bid"])), 0.01)
+                )
                 if (
-                    width_dollars < 500.0
-                    or entry_debit_dollars < 100.0
-                    or entry_debit_dollars > 1000.0
+                    width_dollars <= 0.0
+                    or entry_debit_dollars < min_debit_dollars
+                    or entry_debit_dollars > max_debit_dollars
                     or max_gain_dollars <= 0.0
+                    or combined_spread_pct > max_spread_pct
                 ):
                     continue
+                liquidity_bonus = 0.0
+                if "open_interest" in long_call.index and pd.notna(long_call.get("open_interest")):
+                    liquidity_bonus += min(float(long_call["open_interest"]) / 5000.0, 0.25)
+                if "open_interest" in short_call.index and pd.notna(short_call.get("open_interest")):
+                    liquidity_bonus += min(float(short_call["open_interest"]) / 5000.0, 0.25)
                 score = (
                     (max_gain_dollars / max(entry_debit_dollars, 1.0))
-                    - (abs(float(short_call["delta"]) - 0.30) * 0.25)
+                    - (abs(float(long_call["delta"]) - target_long_delta) * 0.30)
+                    - (abs(float(short_call["delta"]) - target_short_delta) * 0.25)
+                    - combined_spread_pct
+                    + liquidity_bonus
                 )
                 if score <= best_score:
                     continue
@@ -3324,9 +4566,30 @@ def _select_msft_bull_call_spread(day_slice: pd.DataFrame) -> Optional[Dict[str,
                     "entry_debit_dollars": round(entry_debit_dollars, 4),
                     "max_gain_dollars": round(max_gain_dollars, 4),
                     "entry_fees_dollars": 2.0,
+                    "combined_spread_pct": round(combined_spread_pct, 4),
                 }
 
     return best_candidate
+
+
+def _select_msft_bull_call_spread(day_slice: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    return _select_bull_call_spread(
+        day_slice=day_slice,
+        underlying="MSFT",
+        target_dte=45,
+        min_dte=30,
+        max_dte=60,
+        target_long_delta=0.60,
+        min_long_delta=0.50,
+        max_long_delta=0.75,
+        target_short_delta=0.30,
+        min_short_delta=0.20,
+        max_short_delta=0.45,
+        min_debit_dollars=100.0,
+        max_debit_dollars=1000.0,
+        max_spread_pct=0.20,
+        min_open_interest=200,
+    )
 
 
 def _select_bull_put_spread(
@@ -3875,9 +5138,9 @@ def _apply_realistic_pricing_overlay(
 
 
 def _build_tqqq_price_frame(data: pd.DataFrame, start_date: date, end_date: date) -> pd.DataFrame:
-    frame = data.copy()
-    if "date" not in frame.columns or "underlying" not in frame.columns:
+    if "date" not in data.columns or "underlying" not in data.columns or "underlying_price" not in data.columns:
         return pd.DataFrame()
+    frame = data.loc[:, ["date", "underlying", "underlying_price"]].copy()
 
     frame["date"] = pd.to_datetime(frame["date"]).dt.date
     frame = frame[(frame["date"] >= start_date) & (frame["date"] <= end_date)]
@@ -3918,12 +5181,13 @@ def _build_underlying_close_frame(
     end_date: date,
     symbols: List[str],
 ) -> pd.DataFrame:
-    frame = data.copy()
-    if "date" not in frame.columns or "underlying" not in frame.columns or "underlying_price" not in frame.columns:
+    if "date" not in data.columns or "underlying" not in data.columns or "underlying_price" not in data.columns:
         return pd.DataFrame()
+    dates = pd.to_datetime(data["date"]).dt.date
+    mask = data["underlying"].isin(symbols) & (dates >= start_date) & (dates <= end_date)
+    frame = data.loc[mask, ["date", "underlying", "underlying_price"]].copy()
     frame["date"] = pd.to_datetime(frame["date"]).dt.date
-    frame = frame[(frame["date"] >= start_date) & (frame["date"] <= end_date)]
-    frame = frame[frame["underlying"].isin(symbols)][["date", "underlying", "underlying_price"]].dropna()
+    frame = frame.dropna()
     if frame.empty:
         return pd.DataFrame()
     daily = (

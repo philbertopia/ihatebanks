@@ -915,6 +915,36 @@
     ]
   },
   {
+    "strategy_id": "openclaw_call_credit_spread",
+    "strategy_name": "CCS Single Stock AAPL",
+    "variant": "single_stock_aapl",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades AAPL only \u00e2\u20ac\u201d individual stock with ~25-35% IV vs SPY ~15-20%",
+    "description": "Call credit spread on AAPL. 3.5% OTM short call, 5% wide spread, 35-day DTE. Higher IV than SPY/QQQ generates more premium per trade with manageable idiosyncratic risk.",
+    "hypothesis": "AAPL IV averages 1.5-2x SPY IV, producing proportionally higher credit. Tighter 3.5% OTM strike manages single-stock event risk while capturing the IV premium."
+  },
+  {
+    "strategy_id": "openclaw_call_credit_spread",
+    "strategy_name": "CCS Single Stock NVDA",
+    "variant": "single_stock_nvda",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades NVDA only \u00e2\u20ac\u201d high-IV stock with ~50-70% annualized volatility",
+    "description": "Call credit spread on NVDA. 5% OTM short call, 8% wide spread to absorb NVDA's elevated volatility (3-4x SPY IV). Smaller sizing (0.8% risk/trade) to manage outsized moves.",
+    "hypothesis": "NVDA IV at 50-70% generates 3-4x SPY premium per trade. Wider strikes and reduced sizing compensate for higher idiosyncratic risk. Net premium advantage should exceed additional risk."
+  },
+  {
+    "strategy_id": "openclaw_call_credit_spread",
+    "strategy_name": "CCS Multi-Stock Basket",
+    "variant": "multi_stock_basket",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "Trades AAPL, MSFT, NVDA, JPM \u00e2\u20ac\u201d diversified basket of high-IV mega-caps",
+    "description": "Call credit spread across AAPL, MSFT, NVDA, and JPM equally. 4% OTM strikes, 6% wide spreads. Diversification reduces single-stock event risk while maintaining above-SPY IV premium.",
+    "hypothesis": "Spreading across 4 high-IV stocks reduces the impact of any single earnings/news event while capturing the structural IV premium that individual stocks carry over broad-market ETFs."
+  },
+  {
     "strategy_id": "stock_replacement",
     "strategy_name": "Swing RSI Bounce",
     "variant": "swing_rsi_bounce",
@@ -1174,6 +1204,195 @@
       "Always exit by 21 DTE",
       "Stop if option value falls to about 55% of entry debit",
       "Close on bearish trend break"
+    ]
+  },
+  {
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_baseline_30_45",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Research-first hybrid that switches between buying premium and selling premium based on regime and IV, while keeping the official dashboard metrics separate from any later 10-year extension.",
+    "description": "Baseline 30-45 DTE index swing profile. In bullish pullbacks with low IV it buys a bull call debit spread; in bullish pullbacks with richer IV it sells a put credit spread; in bearish or neutral rally-fade setups with high IV it sells a call credit spread.",
+    "hypothesis": "SPY and QQQ swing entries should behave better when the structure matches the volatility regime instead of forcing long calls or credit spreads in every environment.",
+    "entry_rules": [
+      "SPY and QQQ only",
+      "Bull regime: close above MA200, MA20 above MA50, and close above MA50",
+      "Bull pullback trigger: 3-day return between -4.0% and -0.75% plus RSI14 <= 48",
+      "Low IV percentile (< 40) routes to a 30-45 DTE bull call debit spread",
+      "Higher IV percentile (>= 40) routes to the legacy PCS template",
+      "Bear or neutral rally-fade trigger with IV percentile >= 55 routes to the CCS baseline template"
+    ],
+    "management_rules": [
+      "Bull call spread: take profit at 50% of max gain, stop at 35% loss of debit, close at 10 DTE, close on bearish trend break",
+      "PCS leg inherits legacy_replica management",
+      "CCS leg inherits ccs_baseline management",
+      "One position per symbol, max 2 concurrent positions"
+    ]
+  },
+  {
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_defensive_30_45",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Defensive 30-45 DTE version with lower risk per position and tighter debit-spread exits.",
+    "description": "Defensive 30-45 DTE hybrid swing profile. Uses the same regime router as the baseline variant but swaps in pcs_vix_optimal and ccs_defensive while tightening the debit-spread exit rules.",
+    "hypothesis": "A defensive hybrid that buys less extrinsic value and leans on stricter credit-spread templates may improve OOS stability even if raw return falls.",
+    "entry_rules": [
+      "SPY and QQQ only",
+      "Same bull pullback and bear/neutral rally-fade triggers as the baseline profile",
+      "Low IV percentile (< 40) routes to a 30-45 DTE bull call debit spread capped at $900",
+      "Higher IV percentile (>= 40) routes to pcs_vix_optimal",
+      "Bear or neutral rally-fade setup with IV percentile >= 55 routes to ccs_defensive"
+    ],
+    "management_rules": [
+      "Bull call spread: take profit at 40% of max gain, stop at 25% loss of debit, close at 14 DTE, close on bearish trend break",
+      "PCS leg inherits pcs_vix_optimal management",
+      "CCS leg inherits ccs_defensive management",
+      "One position per symbol, max 2 concurrent positions"
+    ]
+  },
+  {
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_baseline_45_60",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Extends the low-IV debit-spread leg into a 45-60 DTE bucket while keeping the same hybrid routing logic.",
+    "description": "Baseline 45-60 DTE hybrid swing profile. Same regime and IV router as the 30-45 variant, but with a slower 45-60 DTE bull call spread to test whether a longer holding envelope matches the swing signal better.",
+    "hypothesis": "A longer debit-spread DTE bucket may better fit multi-day index swing signals while preserving the same premium-selling branches in high-IV environments.",
+    "entry_rules": [
+      "SPY and QQQ only",
+      "Same bull pullback and bear/neutral rally-fade triggers as the baseline profile",
+      "Low IV percentile (< 40) routes to a 45-60 DTE bull call debit spread",
+      "Higher IV percentile (>= 40) routes to the legacy PCS template",
+      "Bear or neutral rally-fade setup with IV percentile >= 55 routes to the CCS baseline template"
+    ],
+    "management_rules": [
+      "Bull call spread: take profit at 50% of max gain, stop at 35% loss of debit, close at 10 DTE, close on bearish trend break",
+      "PCS leg inherits legacy_replica management",
+      "CCS leg inherits ccs_baseline management",
+      "One position per symbol, max 2 concurrent positions"
+    ]
+  },
+  {
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_defensive_45_60",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Defensive 45-60 DTE hybrid with lower risk per position and the stricter PCS/CCS templates.",
+    "description": "Defensive 45-60 DTE hybrid swing profile. Keeps the longer debit-spread bucket but uses pcs_vix_optimal, ccs_defensive, and tighter debit-spread exits.",
+    "hypothesis": "If longer-duration debit spreads are viable, the defensive structure mix should be the cleanest first candidate for OOS survival.",
+    "entry_rules": [
+      "SPY and QQQ only",
+      "Same bull pullback and bear/neutral rally-fade triggers as the other family variants",
+      "Low IV percentile (< 40) routes to a 45-60 DTE bull call debit spread capped at $900",
+      "Higher IV percentile (>= 40) routes to pcs_vix_optimal",
+      "Bear or neutral rally-fade setup with IV percentile >= 55 routes to ccs_defensive"
+    ],
+    "management_rules": [
+      "Bull call spread: take profit at 40% of max gain, stop at 25% loss of debit, close at 14 DTE, close on bearish trend break",
+      "PCS leg inherits pcs_vix_optimal management",
+      "CCS leg inherits ccs_defensive management",
+      "One position per symbol, max 2 concurrent positions"
+    ]
+  },
+  {
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_baseline_30_45_v2",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Second-sweep 30-45 DTE hybrid that broadens the trigger envelope so the high-IV PCS and CCS branches can actually fire more often.",
+    "description": "Baseline 30-45 DTE index swing profile, v2. Broadens the bull pullback and rally-fade triggers, lowers the low-IV cutoff to 25, and allows an overextended bullish tape to route into the CCS baseline template when volatility is elevated.",
+    "hypothesis": "The first sweep was too sparse and over-weighted the low-IV debit-spread branch. A broader trigger window should make the hybrid behave like a real structure router instead of a thin debit-spread strategy.",
+    "entry_rules": [
+      "SPY and QQQ only",
+      "Bull pullback trigger widened to 3-day return between -6.0% and -0.5% with RSI14 <= 52",
+      "Low IV percentile (< 25) routes to a 30-45 DTE bull call debit spread",
+      "Bull pullbacks with IV percentile >= 25 route to the legacy PCS template",
+      "Bear or neutral rally-fade setups with IV percentile >= 45 route to the CCS baseline template",
+      "Overextended bullish rallies may also route to CCS baseline when IV percentile >= 60"
+    ],
+    "management_rules": [
+      "Bull call spread: take profit at 50% of max gain, stop at 35% loss of debit, close at 10 DTE, close on bearish trend break",
+      "PCS leg inherits legacy_replica management",
+      "CCS leg inherits ccs_baseline management",
+      "One position per symbol, max 2 concurrent positions"
+    ]
+  },
+  {
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_defensive_30_45_v2",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Defensive 30-45 DTE second sweep with broader routing thresholds, smaller debit caps, and defensive PCS/CCS templates.",
+    "description": "Defensive 30-45 DTE hybrid swing profile, v2. Uses the broader second-sweep trigger envelope, routes higher-IV bullish pullbacks into pcs_vix_optimal, and uses ccs_defensive for rally-fade shorts.",
+    "hypothesis": "If the first sweep was missing too many valid high-IV setups, broadening the signals while keeping the defensive subtemplates should improve coverage without giving up all discipline.",
+    "entry_rules": [
+      "SPY and QQQ only",
+      "Same widened pullback and rally-fade triggers as the baseline v2 profile",
+      "Low IV percentile (< 25) routes to a 30-45 DTE bull call debit spread capped at $900",
+      "Bull pullbacks with IV percentile >= 25 route to pcs_vix_optimal",
+      "Bear or neutral rally-fade setups with IV percentile >= 45 route to ccs_defensive",
+      "Overextended bullish rallies may also route to ccs_defensive when IV percentile >= 55"
+    ],
+    "management_rules": [
+      "Bull call spread: take profit at 40% of max gain, stop at 25% loss of debit, close at 14 DTE, close on bearish trend break",
+      "PCS leg inherits pcs_vix_optimal management",
+      "CCS leg inherits ccs_defensive management",
+      "One position per symbol, max 2 concurrent positions"
+    ]
+  },
+  {
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_baseline_45_60_v2",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Second-sweep 45-60 DTE hybrid that broadens the trigger envelope and keeps a slower debit-spread bucket.",
+    "description": "Baseline 45-60 DTE index swing profile, v2. Uses the broader second-sweep routing thresholds while keeping the longer 45-60 DTE debit-spread branch and the baseline PCS/CCS subtemplates.",
+    "hypothesis": "If the swing signal has a longer half-life, the broader hybrid router should work better with a slower debit-spread bucket and more frequent high-IV routing.",
+    "entry_rules": [
+      "SPY and QQQ only",
+      "Bull pullback trigger widened to 3-day return between -6.0% and -0.5% with RSI14 <= 52",
+      "Low IV percentile (< 25) routes to a 45-60 DTE bull call debit spread",
+      "Bull pullbacks with IV percentile >= 25 route to the legacy PCS template",
+      "Bear or neutral rally-fade setups with IV percentile >= 45 route to the CCS baseline template",
+      "Overextended bullish rallies may also route to CCS baseline when IV percentile >= 60"
+    ],
+    "management_rules": [
+      "Bull call spread: take profit at 50% of max gain, stop at 35% loss of debit, close at 10 DTE, close on bearish trend break",
+      "PCS leg inherits legacy_replica management",
+      "CCS leg inherits ccs_baseline management",
+      "One position per symbol, max 2 concurrent positions"
+    ]
+  },
+  {
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_defensive_45_60_v2",
+    "status": "experimental",
+    "champion": false,
+    "universe_note": "SPY and QQQ only. Defensive 45-60 DTE second sweep with broader triggers and defensive PCS/CCS routing.",
+    "description": "Defensive 45-60 DTE hybrid swing profile, v2. Uses the broader second-sweep trigger envelope, a $900 debit cap, pcs_vix_optimal, and ccs_defensive while keeping the longer debit bucket.",
+    "hypothesis": "A broader signal envelope plus the longer debit bucket may improve trade count, but the defensive structure mix still needs to keep drawdowns controlled.",
+    "entry_rules": [
+      "SPY and QQQ only",
+      "Same widened pullback and rally-fade triggers as the baseline v2 profile",
+      "Low IV percentile (< 25) routes to a 45-60 DTE bull call debit spread capped at $900",
+      "Bull pullbacks with IV percentile >= 25 route to pcs_vix_optimal",
+      "Bear or neutral rally-fade setups with IV percentile >= 45 route to ccs_defensive",
+      "Overextended bullish rallies may also route to ccs_defensive when IV percentile >= 55"
+    ],
+    "management_rules": [
+      "Bull call spread: take profit at 40% of max gain, stop at 25% loss of debit, close at 14 DTE, close on bearish trend break",
+      "PCS leg inherits pcs_vix_optimal management",
+      "CCS leg inherits ccs_defensive management",
+      "One position per symbol, max 2 concurrent positions"
     ]
   },
   {

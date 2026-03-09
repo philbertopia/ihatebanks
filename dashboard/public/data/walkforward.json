@@ -42,24 +42,24 @@
     }
   },
   "openclaw_put_credit_spread|legacy_replica|top_50": {
-    "walkforward_id": "openclaw_put_credit_spread:legacy_replica:wf-202001:20260306T153125Z",
+    "walkforward_id": "openclaw_put_credit_spread:legacy_replica:wf-201501:20260309T013024Z",
     "strategy_id": "openclaw_put_credit_spread",
     "strategy_name": "Stock Replacement",
     "variant": "legacy_replica",
     "universe_profile": "top_50",
-    "generated_at": "2026-03-06T15:31:25.601547+00:00",
+    "generated_at": "2026-03-09T01:30:24.959489+00:00",
     "oos_summary": {
-      "windows": 7,
-      "avg_total_return_pct": 10.9366,
-      "avg_sharpe_ratio": 3.9573,
-      "avg_max_drawdown_pct": 1.0772,
+      "windows": 13,
+      "avg_total_return_pct": 8.4148,
+      "avg_sharpe_ratio": 2.5052,
+      "avg_max_drawdown_pct": 0.8547,
       "pass_validation": true,
       "criteria": {
         "sharpe_threshold": 0.7,
         "max_dd_threshold": 30.0,
         "return_threshold": 0.0
       },
-      "walkforward_id": "openclaw_put_credit_spread:legacy_replica:wf-202001:20260306T153125Z"
+      "walkforward_id": "openclaw_put_credit_spread:legacy_replica:wf-201501:20260309T013024Z"
     }
   },
   "openclaw_put_credit_spread|pcs_vix_optimal|top_50": {
@@ -483,24 +483,24 @@
     }
   },
   "openclaw_call_credit_spread|ccs_baseline|top_50": {
-    "walkforward_id": "openclaw_call_credit_spread:ccs_baseline:wf-202001:20260306T173701Z",
+    "walkforward_id": "openclaw_call_credit_spread:ccs_baseline:wf-201501:20260309T011724Z",
     "strategy_id": "openclaw_call_credit_spread",
-    "strategy_name": "Call Credit Spread",
+    "strategy_name": "Stock Replacement",
     "variant": "ccs_baseline",
     "universe_profile": "top_50",
-    "generated_at": "2026-03-06T17:37:01.934182+00:00",
+    "generated_at": "2026-03-09T01:17:24.265378+00:00",
     "oos_summary": {
-      "windows": 7,
-      "avg_total_return_pct": 14.2189,
-      "avg_sharpe_ratio": 5.3153,
-      "avg_max_drawdown_pct": 1.2111,
+      "windows": 13,
+      "avg_total_return_pct": 10.4104,
+      "avg_sharpe_ratio": 3.2324,
+      "avg_max_drawdown_pct": 1.0513,
       "pass_validation": true,
       "criteria": {
         "sharpe_threshold": 0.7,
         "max_dd_threshold": 30.0,
         "return_threshold": 0.0
       },
-      "walkforward_id": "openclaw_call_credit_spread:ccs_baseline:wf-202001:20260306T173701Z"
+      "walkforward_id": "openclaw_call_credit_spread:ccs_baseline:wf-201501:20260309T011724Z"
     }
   },
   "intraday_open_close_options|wf_v1_liquidity_guard|top_50": {
@@ -963,6 +963,174 @@
         "return_threshold": 0.0
       },
       "walkforward_id": "openclaw_regime_credit_spread:regime_vix_baseline_bear_only:wf-202001:20260308T221707Z"
+    }
+  },
+  "research_index_swing_options|pullback_baseline_30_45|top_50": {
+    "walkforward_id": "research_index_swing_options:pullback_baseline_30_45:wf-202001:20260309T011747Z",
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_baseline_30_45",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T01:17:47.367850+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 0.0323,
+      "avg_sharpe_ratio": -0.4892,
+      "avg_max_drawdown_pct": 0.08,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_index_swing_options:pullback_baseline_30_45:wf-202001:20260309T011747Z"
+    }
+  },
+  "research_index_swing_options|pullback_defensive_30_45|top_50": {
+    "walkforward_id": "research_index_swing_options:pullback_defensive_30_45:wf-202001:20260309T012032Z",
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_defensive_30_45",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T01:20:32.517351+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 0.0323,
+      "avg_sharpe_ratio": -0.4892,
+      "avg_max_drawdown_pct": 0.08,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_index_swing_options:pullback_defensive_30_45:wf-202001:20260309T012032Z"
+    }
+  },
+  "research_index_swing_options|pullback_baseline_45_60|top_50": {
+    "walkforward_id": "research_index_swing_options:pullback_baseline_45_60:wf-202001:20260309T012333Z",
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_baseline_45_60",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T01:23:33.806605+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 0.3803,
+      "avg_sharpe_ratio": 0.0179,
+      "avg_max_drawdown_pct": 0.0457,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_index_swing_options:pullback_baseline_45_60:wf-202001:20260309T012333Z"
+    }
+  },
+  "research_index_swing_options|pullback_defensive_45_60|top_50": {
+    "walkforward_id": "research_index_swing_options:pullback_defensive_45_60:wf-202001:20260309T012635Z",
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_defensive_45_60",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T01:26:35.354248+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 0.2023,
+      "avg_sharpe_ratio": -0.1557,
+      "avg_max_drawdown_pct": 0.0406,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_index_swing_options:pullback_defensive_45_60:wf-202001:20260309T012635Z"
+    }
+  },
+  "research_index_swing_options|pullback_baseline_30_45_v2|top_50": {
+    "walkforward_id": "research_index_swing_options:pullback_baseline_30_45_v2:wf-202001:20260309T022431Z",
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_baseline_30_45_v2",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T02:24:31.380309+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 0.15,
+      "avg_sharpe_ratio": -19.4556,
+      "avg_max_drawdown_pct": 0.1071,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_index_swing_options:pullback_baseline_30_45_v2:wf-202001:20260309T022431Z"
+    }
+  },
+  "research_index_swing_options|pullback_defensive_30_45_v2|top_50": {
+    "walkforward_id": "research_index_swing_options:pullback_defensive_30_45_v2:wf-202001:20260309T022806Z",
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_defensive_30_45_v2",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T02:28:06.313731+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 0.1386,
+      "avg_sharpe_ratio": -19.4714,
+      "avg_max_drawdown_pct": 0.1073,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_index_swing_options:pullback_defensive_30_45_v2:wf-202001:20260309T022806Z"
+    }
+  },
+  "research_index_swing_options|pullback_baseline_45_60_v2|top_50": {
+    "walkforward_id": "research_index_swing_options:pullback_baseline_45_60_v2:wf-202001:20260309T023139Z",
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_baseline_45_60_v2",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T02:31:39.879962+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 0.526,
+      "avg_sharpe_ratio": 0.1206,
+      "avg_max_drawdown_pct": 0.0453,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_index_swing_options:pullback_baseline_45_60_v2:wf-202001:20260309T023139Z"
+    }
+  },
+  "research_index_swing_options|pullback_defensive_45_60_v2|top_50": {
+    "walkforward_id": "research_index_swing_options:pullback_defensive_45_60_v2:wf-202001:20260309T050927Z",
+    "strategy_id": "research_index_swing_options",
+    "strategy_name": "Research Index Swing Options",
+    "variant": "pullback_defensive_45_60_v2",
+    "universe_profile": "top_50",
+    "generated_at": "2026-03-09T05:09:27.570778+00:00",
+    "oos_summary": {
+      "windows": 7,
+      "avg_total_return_pct": 0.2871,
+      "avg_sharpe_ratio": -0.0672,
+      "avg_max_drawdown_pct": 0.0404,
+      "pass_validation": false,
+      "criteria": {
+        "sharpe_threshold": 0.4,
+        "max_dd_threshold": 35.0,
+        "return_threshold": 0.0
+      },
+      "walkforward_id": "research_index_swing_options:pullback_defensive_45_60_v2:wf-202001:20260309T050927Z"
     }
   }
 }
